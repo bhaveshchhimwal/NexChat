@@ -229,18 +229,20 @@ wss.on('connection', (connection, req) => {
       }
 
       if (recipient && (text || file)) {
+        // FIXED: Store Cloudinary URL in database instead of filename
         const messageDoc = await Message.create({
           sender: connection.userId,
           recipient,
           text,
-          file: file ? file.name : null,
+          file: file ? fileUrl : null, // ✅ Store the Cloudinary URL
         });
 
+        // FIXED: Broadcast the same Cloudinary URL
         const broadcastPayload = {
           text,
           sender: connection.userId,
           recipient,
-          file: file ? fileUrl : null,
+          file: file ? fileUrl : null, // ✅ Broadcast the Cloudinary URL
           _id: messageDoc._id,
         };
 
