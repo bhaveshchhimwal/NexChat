@@ -6,6 +6,7 @@ import { uniqBy } from "lodash";
 import axios from "axios";
 import Contact from "./Contact";
 import { Trash2 } from "lucide-react";
+import aiLogo from "./assets/generative.png";
 
 axios.defaults.baseURL = "http://localhost:4040";
 axios.defaults.withCredentials = true;
@@ -17,6 +18,9 @@ export default function Chat() {
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [newMessageText, setNewMessageText] = useState("");
   const [messages, setMessages] = useState([]);
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [aiQuestion, setAiQuestion] = useState("");       // ✅ AI question
+  const [aiResponse, setAiResponse] = useState("");       // ✅ AI response
   const { username, id, setId, setUsername } = useContext(UserContext);
   const divUnderMessages = useRef();
 
@@ -48,7 +52,6 @@ export default function Chat() {
     };
   }, []);
 
-  // ---------------- Handle online users ----------------
   function showOnlinePeople(peopleArray) {
     const people = {};
     peopleArray.forEach(({ userId, username }) => {
@@ -57,7 +60,6 @@ export default function Chat() {
     setOnlinePeople(people);
   }
 
-  // ---------------- Handle incoming messages ----------------
   function handleMessage(ev) {
     const messageData = JSON.parse(ev.data);
     if ("online" in messageData) {
@@ -77,7 +79,6 @@ export default function Chat() {
     }
   }
 
-  // ---------------- Logout ----------------
   function logout() {
     axios.post("/logout").then(() => {
       if (ws) ws.close();
@@ -87,7 +88,6 @@ export default function Chat() {
     });
   }
 
-  // ---------------- Send message ----------------
   function sendMessage(ev, file = null) {
     if (ev) ev.preventDefault();
     if (!ws) return;
@@ -114,7 +114,6 @@ export default function Chat() {
     setNewMessageText("");
   }
 
-  // ---------------- Send file ----------------
   function sendFile(ev) {
     const reader = new FileReader();
     reader.readAsDataURL(ev.target.files[0]);
@@ -126,13 +125,11 @@ export default function Chat() {
     };
   }
 
-  // ---------------- Scroll to bottom ----------------
   useEffect(() => {
     const div = divUnderMessages.current;
     if (div) div.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
 
-  // ---------------- Load offline people ----------------
   useEffect(() => {
     axios.get("/people").then((res) => {
       const offlinePeopleArr = res.data
@@ -146,7 +143,6 @@ export default function Chat() {
     });
   }, [onlinePeople]);
 
-  // ---------------- Load messages for selected user ----------------
   useEffect(() => {
     if (selectedUserId) {
       axios.get("/messages/" + selectedUserId).then((res) => {
@@ -160,7 +156,6 @@ export default function Chat() {
 
   const messagesWithoutDupes = uniqBy(messages, "_id");
 
-  // ---------------- Delete message ----------------
   function deleteMessage(messageId) {
     if (window.confirm("Are you sure you want to delete this message?")) {
       axios.delete(`/messages/${messageId}`).then(() => {
@@ -178,7 +173,19 @@ export default function Chat() {
     }
   }
 
-  // ---------------- JSX ----------------
+  // ✅ Ask AI function (fixed)
+  async function askAI() {
+    if (!aiQuestion.trim()) return;
+    try {
+      // ⚡ Use 'message' key to match backend
+      const res = await axios.post("/api/ai", { message: aiQuestion });
+      setAiResponse(res.data.reply);
+    } catch (err) {
+      console.error(err);
+      setAiResponse("Error getting response from AI.");
+    }
+  }
+
   return (
     <div className="flex h-screen">
       {/* Sidebar */}
@@ -206,7 +213,7 @@ export default function Chat() {
             />
           ))}
         </div>
-          <div className="p-2 text-center flex items-center justify-center">
+        <div className="p-2 text-center flex items-center justify-center">
           <span className="mr-2 text-sm text-gray-600 flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
               <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
@@ -220,7 +227,7 @@ export default function Chat() {
       </div>
 
       {/* Chat window */}
-      <div className="flex flex-col bg-blue-50 w-2/3 p-2">
+      <div className="flex flex-col bg-blue-50 w-2/3 p-2 relative">
         <div className="flex-grow">
           {!selectedUserId && (
             <div className="flex h-full flex-grow items-center justify-center">
@@ -304,7 +311,7 @@ export default function Chat() {
 
         {/* Message input */}
         {!!selectedUserId && (
-          <form className="flex gap-2" onSubmit={sendMessage}>
+          <form className="flex gap-2 relative" onSubmit={sendMessage}>
             <input
               type="text"
               value={newMessageText}
@@ -312,6 +319,17 @@ export default function Chat() {
               placeholder="Type your message here"
               className="bg-white flex-grow border rounded-sm p-2"
             />
+
+            {/* AI Assistant button */}
+            <button
+              type="button"
+              onClick={() => setShowAIAssistant((prev) => !prev)}
+              className="bg-blue-200 p-2 text-gray-600 rounded-sm border border-blue-200 flex items-center justify-center"
+              title="AI Assistant"
+            >
+              <img src={aiLogo} alt="AI Assistant" className="w-5 h-5" />
+            </button>
+
             <label className="bg-blue-200 p-2 text-gray-600 cursor-pointer rounded-sm border border-blue-200">
               <input type="file" className="hidden" onChange={sendFile} />
               📎
@@ -322,6 +340,34 @@ export default function Chat() {
             >
               ➤
             </button>
+
+            {/* AI Popup card */}
+            {showAIAssistant && (
+              <div className="absolute bottom-12 right-16 w-64 bg-white shadow-lg rounded-md p-3 border">
+                <h3 className="text-sm font-semibold mb-2">Ask AI Assistant</h3>
+                <textarea
+                  className="w-full border rounded-md p-2 text-sm focus:outline-none"
+                  placeholder="Ask your question..."
+                  rows="3"
+                  value={aiQuestion}
+                  onChange={(e) => setAiQuestion(e.target.value)}
+                ></textarea>
+                <button
+                  type="button"
+                  onClick={askAI}
+                  className="mt-2 w-full bg-blue-500 text-white text-sm py-1 rounded-md hover:bg-blue-600"
+                >
+                  Send
+                </button>
+
+                {/* ✅ Show AI response */}
+                {aiResponse && (
+                  <div className="mt-2 p-2 text-sm bg-gray-50 border rounded">
+                    {aiResponse}
+                  </div>
+                )}
+              </div>
+            )}
           </form>
         )}
       </div>

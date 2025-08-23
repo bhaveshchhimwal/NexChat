@@ -11,6 +11,7 @@
     "lucide-react": "^0.541.0",
     "mongodb": "^6.18.0",
     "mongoose": "^8.17.0",
+    "node-fetch": "^3.3.2",
     "ws": "^8.18.3"
   }
 }
