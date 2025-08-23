@@ -10,26 +10,26 @@ export default function RegisterAndLoginForm() {
   const [error, setError] = useState(""); // <-- new state for errors
   const { setUsername: setLoggedInUsername, setId } = useContext(UserContext);
 
- async function handleSubmit(ev) {
-  ev.preventDefault();
-  setError(""); // clear error before new request
-  const url = isLoginOrRegister === "register" ? "register" : "login";
+  async function handleSubmit(ev) {
+    ev.preventDefault();
+    setError(""); // clear error before new request
+    const url = isLoginOrRegister === "register" ? "register" : "login";
 
-  try {
-    const { data } = await axios.post(url, { username, password });
-    setLoggedInUsername(username);
-    setId(data.id);
-  } catch (err) {
-    if (err.response && err.response.data && err.response.data.message) {
-      setError(err.response.data.message);
-    } else {
-      setError("Something went wrong. Please try again.");
+    try {
+      const { data } = await axios.post(url, { username, password });
+      setLoggedInUsername(username);
+      setId(data.id);
+    } catch (err) {
+      if (err.response && err.response.data && err.response.data.message) {
+        setError(err.response.data.message);
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
     }
   }
-}
 
   return (
-    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-purple-100 to-blue-100">
+    <div className="h-screen flex flex-col items-center justify-center bg-gradient-to-br from-purple-100 to-blue-100">
       <div className="bg-white p-8 rounded-2xl shadow-md w-80 text-center">
         {/* Logo + Title */}
         <div className="mb-6">
@@ -95,6 +95,11 @@ export default function RegisterAndLoginForm() {
           )}
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="mt-7 text-xm text-gray-500">
+        Designed & Developed by Bhavesh Chhimwal
+      </footer>
     </div>
   );
 }

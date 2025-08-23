@@ -62,10 +62,18 @@ export default function Chat() {
     const messageData = JSON.parse(ev.data);
     if ("online" in messageData) {
       showOnlinePeople(messageData.online);
-    } else if ("text" in messageData) {
-      if (messageData.sender === selectedUserId) {
+    } else if ("text" in messageData || "file" in messageData) {
+      if (messageData.sender === selectedUserId || messageData.sender === id) {
         setMessages((prev) => [...prev, { ...messageData }]);
       }
+    } else if (messageData.type === "delete") {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m._id === messageData.messageId
+            ? { ...m, text: "Message deleted", file: null, deleted: true }
+            : m
+        )
+      );
     }
   }
 
@@ -92,22 +100,18 @@ export default function Chat() {
       })
     );
 
-    if (file) {
-      axios.get("/messages/" + selectedUserId).then((res) => {
-        setMessages(res.data);
-      });
-    } else {
-      setNewMessageText("");
-      setMessages((prev) => [
-        ...prev,
-        {
-          text: newMessageText,
-          sender: id,
-          recipient: selectedUserId,
-          _id: Date.now(),
-        },
-      ]);
-    }
+    setMessages((prev) => [
+      ...prev,
+      {
+        text: newMessageText,
+        sender: id,
+        recipient: selectedUserId,
+        file: file ? file.data : null,
+        _id: Date.now(),
+      },
+    ]);
+
+    setNewMessageText("");
   }
 
   // ---------------- Send file ----------------
@@ -162,9 +166,14 @@ export default function Chat() {
       axios.delete(`/messages/${messageId}`).then(() => {
         setMessages((prev) =>
           prev.map((m) =>
-            m._id === messageId ? { ...m, text: "Message deleted" } : m
+            m._id === messageId
+              ? { ...m, text: "Message deleted", file: null, deleted: true }
+              : m
           )
         );
+        if (ws) {
+          ws.send(JSON.stringify({ type: "delete", messageId }));
+        }
       });
     }
   }
@@ -232,7 +241,7 @@ export default function Chat() {
                         : "flex justify-start my-2"
                     }
                   >
-                    {message.sender === id && (
+                    {message.sender === id && !message.deleted && (
                       <button
                         onClick={() => deleteMessage(message._id)}
                         className="text-red-500 mr-2"
@@ -248,17 +257,41 @@ export default function Chat() {
                           : "bg-white text-gray-500")
                       }
                     >
-                      {message.text}
-                      {message.file && (
-                        <div>
-                          <a
-                            target="_blank"
-                            className="flex items-center gap-1 border-b"
-                            href={axios.defaults.baseURL + "/uploads/" + message.file}
-                          >
-                            {message.file}
-                          </a>
-                        </div>
+                      {message.deleted ? (
+                        "Message deleted"
+                      ) : (
+                        <>
+                          {message.text}
+                          {!message.deleted && message.file && (
+                            <div>
+                              <a
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center gap-1 border-b"
+                                href={
+                                  message.file.startsWith("http")
+                                    ? message.file
+                                    : axios.defaults.baseURL + "/uploads/" + message.file
+                                }
+                              >
+                                {message.file.split("/").pop()}
+                              </a>
+                              {(message.file.endsWith(".png") ||
+                                message.file.endsWith(".jpg") ||
+                                message.file.endsWith(".jpeg")) && (
+                                <img
+                                  src={
+                                    message.file.startsWith("http")
+                                      ? message.file
+                                      : axios.defaults.baseURL + "/uploads/" + message.file
+                                  }
+                                  alt="file"
+                                  className="max-w-xs mt-1"
+                                />
+                              )}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
