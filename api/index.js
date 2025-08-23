@@ -243,6 +243,7 @@ wss.on('connection', (connection, req) => {
         if (messageDoc) {
           messageDoc.text = 'Message deleted';
           messageDoc.deleted = true;
+          messageDoc.file = null;
           await messageDoc.save();
 
           [...wss.clients]
@@ -278,27 +279,25 @@ wss.on('connection', (connection, req) => {
           sender: connection.userId,
           recipient,
           text,
-          file: file ? fileUrl : null,
+          file: file ? file.name : null, // The client needs the original file name, not the URL
         });
+        
+        const broadcastPayload = {
+          text,
+          sender: connection.userId,
+          recipient,
+          file: file ? fileUrl : null, // The client needs the URL here for display
+          _id: messageDoc._id,
+        };
 
         [...wss.clients]
           .filter(
             (c) => c.userId === recipient || c.userId === connection.userId
           )
-          .forEach((c) =>
-            c.send(
-              JSON.stringify({
-                text,
-                sender: connection.userId,
-                recipient,
-                file: file ? fileUrl : null,
-                _id: messageDoc._id,
-              })
-            )
-          );
+          .forEach((c) => c.send(JSON.stringify(broadcastPayload)));
       }
-    } catch {
-      // swallow parse errors
+    } catch (error) {
+      console.error('Error handling WebSocket message:', error);
     }
   });
 

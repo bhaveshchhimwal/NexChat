@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState, useCallback } from "react";
 import Avatar from "./Avatar";
 import Logo from "./Logo";
 import { UserContext } from "./UserContext.jsx";
@@ -21,8 +21,48 @@ export default function Chat() {
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [aiQuestion, setAiQuestion] = useState("");
   const [aiResponse, setAiResponse] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
   const { username, id, setId, setUsername } = useContext(UserContext);
   const divUnderMessages = useRef();
+
+  function showOnlinePeople(peopleArray) {
+    const people = {};
+    peopleArray.forEach(({ userId, username }) => {
+      people[userId] = username;
+    });
+    setOnlinePeople(people);
+  }
+
+  const handleMessage = useCallback((ev) => {
+    const messageData = JSON.parse(ev.data);
+    if ("online" in messageData) {
+      showOnlinePeople(messageData.online);
+    } else if ("text" in messageData || "file" in messageData) {
+      setMessages((prev) => {
+        // Remove temp message that matches
+        let filtered = prev.filter(
+          (m) =>
+            !(
+              m.sender === messageData.sender &&
+              m.recipient === messageData.recipient &&
+              m.text === messageData.text &&
+              m.file === messageData.file &&
+              m._id.startsWith("temp")
+            )
+        );
+        // Add new message with uniqBy to avoid duplicate by _id
+        return uniqBy([...filtered, messageData], "_id");
+      });
+    } else if (messageData.type === "delete") {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m._id === messageData.messageId
+            ? { ...m, text: "Message deleted", file: null, deleted: true }
+            : m
+        )
+      );
+    }
+  }, []);
 
   // ---------------- WebSocket connection ----------------
   useEffect(() => {
@@ -50,37 +90,7 @@ export default function Chat() {
     return () => {
       if (ws) ws.close();
     };
-  }, []);
-
-  function showOnlinePeople(peopleArray) {
-    const people = {};
-    peopleArray.forEach(({ userId, username }) => {
-      people[userId] = username;
-    });
-    setOnlinePeople(people);
-  }
-
-  function handleMessage(ev) {
-    const messageData = JSON.parse(ev.data);
-    if ("online" in messageData) {
-      showOnlinePeople(messageData.online);
-    } else if ("text" in messageData || "file" in messageData) {
-      if (messageData.sender === selectedUserId || messageData.sender === id) {
-        setMessages((prev) => {
-          if (prev.some((m) => m._id === messageData._id)) return prev; // ✅ avoid duplicates
-          return [...prev, messageData];
-        });
-      }
-    } else if (messageData.type === "delete") {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m._id === messageData.messageId
-            ? { ...m, text: "Message deleted", file: null, deleted: true }
-            : m
-        )
-      );
-    }
-  }
+  }, [handleMessage]);
 
   function logout() {
     axios.post("/logout").then(() => {
@@ -94,6 +104,17 @@ export default function Chat() {
   function sendMessage(ev, file = null) {
     if (ev) ev.preventDefault();
     if (!ws) return;
+
+    const tempId = "temp" + Date.now().toString() + Math.random().toString().slice(2, 11);
+    const newSentMessage = {
+      _id: tempId,
+      sender: id,
+      recipient: selectedUserId,
+      text: newMessageText,
+      file: file ? file.name : null,
+      deleted: false,
+    };
+    setMessages((prev) => [...prev, newSentMessage]);
 
     ws.send(
       JSON.stringify({
@@ -133,7 +154,7 @@ export default function Chat() {
       });
       setOfflinePeople(offlinePeople);
     });
-  }, [onlinePeople]);
+  }, [onlinePeople, id]);
 
   useEffect(() => {
     if (selectedUserId) {
@@ -146,7 +167,10 @@ export default function Chat() {
   const onlinePeopleExclOurUser = { ...onlinePeople };
   delete onlinePeopleExclOurUser[id];
 
-  const messagesWithoutDupes = uniqBy(messages, "_id");
+  const messagesWithoutDupes = uniqBy(messages, "_id").filter(message => {
+    return (message.sender === selectedUserId && message.recipient === id) ||
+           (message.sender === id && message.recipient === selectedUserId);
+  });
 
   function deleteMessage(messageId) {
     if (window.confirm("Are you sure you want to delete this message?")) {
@@ -165,14 +189,27 @@ export default function Chat() {
     }
   }
 
+  // -------------- AI Assistant ----------------
   async function askAI() {
     if (!aiQuestion.trim()) return;
+    setAiResponse("");
+    setAiLoading(true);
     try {
       const res = await axios.post("/api/ai", { message: aiQuestion });
       setAiResponse(res.data.reply);
+      setAiQuestion("");
     } catch (err) {
       console.error(err);
       setAiResponse("Error getting response from AI.");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  function handleAiKeyDown(e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      askAI();
     }
   }
 
@@ -203,16 +240,16 @@ export default function Chat() {
             />
           ))}
         </div>
-        <div className="p-2 text-center flex items-center justify-center">
+         <div className="p-2 text-center flex items-center justify-center">
           <span className="mr-2 text-sm text-gray-600 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+              <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
+            </svg>
             {username}
           </span>
           <button
             onClick={logout}
-            className="text-sm bg-blue-100 py-1 px-2 text-gray-500 border rounded-sm"
-          >
-            logout
-          </button>
+            className="text-sm bg-blue-100 py-1 px-2 text-gray-500 border rounded-sm">logout</button>
         </div>
       </div>
 
@@ -331,27 +368,30 @@ export default function Chat() {
             </button>
 
             {showAIAssistant && (
-              <div className="absolute bottom-12 right-16 w-64 bg-white shadow-lg rounded-md p-3 border">
+              <div className="absolute bottom-12 right-16 w-96 bg-white shadow-lg rounded-md p-4 border z-50">
                 <h3 className="text-sm font-semibold mb-2">Ask AI Assistant</h3>
                 <textarea
                   className="w-full border rounded-md p-2 text-sm focus:outline-none"
                   placeholder="Ask your question..."
-                  rows="3"
+                  rows="4"
                   value={aiQuestion}
                   onChange={(e) => setAiQuestion(e.target.value)}
+                  onKeyDown={handleAiKeyDown}
                 ></textarea>
                 <button
                   type="button"
                   onClick={askAI}
-                  className="mt-2 w-full bg-blue-500 text-white text-sm py-1 rounded-md hover:bg-blue-600"
+                  className="mt-2 w-full bg-blue-500 text-white text-sm py-2 rounded-md hover:bg-blue-600"
                 >
                   Send
                 </button>
-                {aiResponse && (
-                  <div className="mt-2 p-2 text-sm bg-gray-50 border rounded">
-                    {aiResponse}
-                  </div>
-                )}
+                <div className="mt-2 p-2 text-sm bg-gray-50 border rounded min-h-[50px] flex items-center justify-center">
+                  {aiLoading ? (
+                    <div className="animate-spin border-2 border-gray-300 border-t-blue-500 w-5 h-5 rounded-full"></div>
+                  ) : (
+                    aiResponse
+                  )}
+                </div>
               </div>
             )}
           </form>
