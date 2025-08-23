@@ -7,6 +7,9 @@ import axios from "axios";
 import Contact from "./Contact";
 import { Trash2 } from "lucide-react";
 
+axios.defaults.baseURL = "http://localhost:4040";
+axios.defaults.withCredentials = true;
+
 export default function Chat() {
   const [ws, setWs] = useState(null);
   const [onlinePeople, setOnlinePeople] = useState({});
@@ -17,22 +20,35 @@ export default function Chat() {
   const { username, id, setId, setUsername } = useContext(UserContext);
   const divUnderMessages = useRef();
 
+  // ---------------- WebSocket connection ----------------
   useEffect(() => {
-    connectToWs();
-  }, [selectedUserId]);
+    let ws;
 
-  function connectToWs() {
-    const ws = new WebSocket("ws://localhost:4040");
-    setWs(ws);
-    ws.addEventListener("message", handleMessage);
-    ws.addEventListener("close", () => {
-      setTimeout(() => {
+    function connectToWs() {
+      ws = new WebSocket("ws://localhost:4040");
+
+      ws.addEventListener("open", () => {
+        console.log("WebSocket connected");
+      });
+
+      ws.addEventListener("message", handleMessage);
+
+      ws.addEventListener("close", () => {
         console.log("Disconnected. Trying to reconnect.");
-        connectToWs();
-      }, 1000);
-    });
-  }
+        setTimeout(connectToWs, 1000);
+      });
 
+      setWs(ws);
+    }
+
+    connectToWs();
+
+    return () => {
+      if (ws) ws.close();
+    };
+  }, []);
+
+  // ---------------- Handle online users ----------------
   function showOnlinePeople(peopleArray) {
     const people = {};
     peopleArray.forEach(({ userId, username }) => {
@@ -41,6 +57,7 @@ export default function Chat() {
     setOnlinePeople(people);
   }
 
+  // ---------------- Handle incoming messages ----------------
   function handleMessage(ev) {
     const messageData = JSON.parse(ev.data);
     if ("online" in messageData) {
@@ -52,16 +69,21 @@ export default function Chat() {
     }
   }
 
+  // ---------------- Logout ----------------
   function logout() {
     axios.post("/logout").then(() => {
+      if (ws) ws.close();
       setWs(null);
       setId(null);
       setUsername(null);
     });
   }
 
+  // ---------------- Send message ----------------
   function sendMessage(ev, file = null) {
     if (ev) ev.preventDefault();
+    if (!ws) return;
+
     ws.send(
       JSON.stringify({
         recipient: selectedUserId,
@@ -69,6 +91,7 @@ export default function Chat() {
         file,
       })
     );
+
     if (file) {
       axios.get("/messages/" + selectedUserId).then((res) => {
         setMessages(res.data);
@@ -87,6 +110,7 @@ export default function Chat() {
     }
   }
 
+  // ---------------- Send file ----------------
   function sendFile(ev) {
     const reader = new FileReader();
     reader.readAsDataURL(ev.target.files[0]);
@@ -98,13 +122,13 @@ export default function Chat() {
     };
   }
 
+  // ---------------- Scroll to bottom ----------------
   useEffect(() => {
     const div = divUnderMessages.current;
-    if (div) {
-      div.scrollIntoView({ behavior: "smooth", block: "end" });
-    }
+    if (div) div.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
 
+  // ---------------- Load offline people ----------------
   useEffect(() => {
     axios.get("/people").then((res) => {
       const offlinePeopleArr = res.data
@@ -118,6 +142,7 @@ export default function Chat() {
     });
   }, [onlinePeople]);
 
+  // ---------------- Load messages for selected user ----------------
   useEffect(() => {
     if (selectedUserId) {
       axios.get("/messages/" + selectedUserId).then((res) => {
@@ -131,7 +156,7 @@ export default function Chat() {
 
   const messagesWithoutDupes = uniqBy(messages, "_id");
 
-  // 🗑 delete handler with confirmation + show "Message deleted"
+  // ---------------- Delete message ----------------
   function deleteMessage(messageId) {
     if (window.confirm("Are you sure you want to delete this message?")) {
       axios.delete(`/messages/${messageId}`).then(() => {
@@ -144,6 +169,7 @@ export default function Chat() {
     }
   }
 
+  // ---------------- JSX ----------------
   return (
     <div className="flex h-screen">
       {/* Sidebar */}
@@ -156,9 +182,7 @@ export default function Chat() {
               id={userId}
               online={true}
               username={onlinePeopleExclOurUser[userId]}
-              onClick={() => {
-                setSelectedUserId(userId);
-              }}
+              onClick={() => setSelectedUserId(userId)}
               selected={userId === selectedUserId}
             />
           ))}
@@ -175,18 +199,6 @@ export default function Chat() {
         </div>
         <div className="p-2 text-center flex items-center justify-center">
           <span className="mr-2 text-sm text-gray-600 flex items-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="w-4 h-4"
-            >
-              <path
-                fillRule="evenodd"
-                d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z"
-                clipRule="evenodd"
-              />
-            </svg>
             {username}
           </span>
           <button
@@ -242,11 +254,7 @@ export default function Chat() {
                           <a
                             target="_blank"
                             className="flex items-center gap-1 border-b"
-                            href={
-                              axios.defaults.baseURL +
-                              "/uploads/" +
-                              message.file
-                            }
+                            href={axios.defaults.baseURL + "/uploads/" + message.file}
                           >
                             {message.file}
                           </a>
