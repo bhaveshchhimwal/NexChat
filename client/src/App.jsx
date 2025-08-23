@@ -1,6 +1,6 @@
 import axios from "axios";
-import {UserContextProvider} from "./UserContext.jsx";
-import Routes from "./Routes.jsx";
+import {UserContextProvider} from "./UserContext";
+import Routes from "./Routes";
 
 function App() {
   axios.defaults.baseURL = 'http://localhost:4040';
