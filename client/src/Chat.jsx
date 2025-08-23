@@ -5,7 +5,6 @@ import { UserContext } from "./UserContext.jsx";
 import { uniqBy } from "lodash";
 import axios from "axios";
 import Contact from "./Contact";
-import { Trash2 } from "lucide-react";
 import aiLogo from "./assets/generative.png";
 
 axios.defaults.baseURL = "http://localhost:4040";
@@ -39,7 +38,6 @@ export default function Chat() {
       showOnlinePeople(messageData.online);
     } else if ("text" in messageData || "file" in messageData) {
       setMessages((prev) => {
-        // Remove temp message that matches
         let filtered = prev.filter(
           (m) =>
             !(
@@ -50,17 +48,8 @@ export default function Chat() {
               m._id.startsWith("temp")
             )
         );
-        // Add new message with uniqBy to avoid duplicate by _id
         return uniqBy([...filtered, messageData], "_id");
       });
-    } else if (messageData.type === "delete") {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m._id === messageData.messageId
-            ? { ...m, text: "Message deleted", file: null, deleted: true }
-            : m
-        )
-      );
     }
   }, []);
 
@@ -172,23 +161,6 @@ export default function Chat() {
            (message.sender === id && message.recipient === selectedUserId);
   });
 
-  function deleteMessage(messageId) {
-    if (window.confirm("Are you sure you want to delete this message?")) {
-      axios.delete(`/messages/${messageId}`).then(() => {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m._id === messageId
-              ? { ...m, text: "Message deleted", file: null, deleted: true }
-              : m
-          )
-        );
-        if (ws) {
-          ws.send(JSON.stringify({ type: "delete", messageId }));
-        }
-      });
-    }
-  }
-
   // -------------- AI Assistant ----------------
   async function askAI() {
     if (!aiQuestion.trim()) return;
@@ -275,14 +247,6 @@ export default function Chat() {
                         : "flex justify-start my-2"
                     }
                   >
-                    {message.sender === id && !message.deleted && (
-                      <button
-                        onClick={() => deleteMessage(message._id)}
-                        className="text-red-500 mr-2"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    )}
                     <div
                       className={
                         "inline-block p-2 rounded-md text-sm max-w-xs " +
@@ -291,41 +255,52 @@ export default function Chat() {
                           : "bg-white text-gray-500")
                       }
                     >
-                      {message.deleted ? (
-                        "Message deleted"
-                      ) : (
-                        <>
+                      {message.text && message.text.trim() && (
+                        <div className={message.file ? "mb-2" : ""}>
                           {message.text}
-                          {!message.deleted && message.file && (
-                            <div>
-                              <a
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex items-center gap-1 border-b"
-                                href={
-                                  message.file.startsWith("http")
-                                    ? message.file
-                                    : axios.defaults.baseURL + "/uploads/" + message.file
-                                }
-                              >
-                                {message.file.split("/").pop()}
-                              </a>
-                              {(message.file.endsWith(".png") ||
-                                message.file.endsWith(".jpg") ||
-                                message.file.endsWith(".jpeg")) && (
-                                <img
-                                  src={
-                                    message.file.startsWith("http")
-                                      ? message.file
-                                      : axios.defaults.baseURL + "/uploads/" + message.file
-                                  }
-                                  alt="file"
-                                  className="max-w-xs mt-1"
-                                />
+                        </div>
+                      )}
+                      
+                      {message.file && (
+                        <div>
+                          {(message.file.endsWith(".png") ||
+                            message.file.endsWith(".jpg") ||
+                            message.file.endsWith(".jpeg") ||
+                            message.file.endsWith(".gif") ||
+                            message.file.endsWith(".webp")) ? (
+                            <img
+                              src={
+                                message.file.startsWith("http")
+                                  ? message.file
+                                  : axios.defaults.baseURL + "/uploads/" + message.file
+                              }
+                              alt="shared image"
+                              className="max-w-xs rounded cursor-pointer block"
+                              onClick={() => window.open(
+                                message.file.startsWith("http")
+                                  ? message.file
+                                  : axios.defaults.baseURL + "/uploads/" + message.file,
+                                '_blank'
                               )}
-                            </div>
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <a
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-1 border-b"
+                              href={
+                                message.file.startsWith("http")
+                                  ? message.file
+                                  : axios.defaults.baseURL + "/uploads/" + message.file
+                              }
+                            >
+                              📎 {message.file.split("/").pop()}
+                            </a>
                           )}
-                        </>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -350,47 +325,70 @@ export default function Chat() {
             <button
               type="button"
               onClick={() => setShowAIAssistant((prev) => !prev)}
-              className="bg-blue-200 p-2 text-gray-600 rounded-sm border border-blue-200 flex items-center justify-center"
+              className="bg-blue-200 p-2 text-gray-600 rounded-sm border border-blue-200 flex items-center justify-center hover:bg-blue-300 transition-colors"
               title="AI Assistant"
             >
               <img src={aiLogo} alt="AI Assistant" className="w-5 h-5" />
             </button>
 
-            <label className="bg-blue-200 p-2 text-gray-600 cursor-pointer rounded-sm border border-blue-200">
+            <label className="bg-blue-200 p-2 text-gray-600 cursor-pointer rounded-sm border border-blue-200 hover:bg-blue-300 transition-colors">
               <input type="file" className="hidden" onChange={sendFile} />
               📎
             </label>
             <button
               type="submit"
-              className="bg-blue-500 p-2 text-white rounded-sm"
+              className="bg-blue-500 p-2 text-white rounded-sm hover:bg-blue-600 transition-colors"
             >
               ➤
             </button>
 
             {showAIAssistant && (
-              <div className="absolute bottom-12 right-16 w-96 bg-white shadow-lg rounded-md p-4 border z-50">
-                <h3 className="text-sm font-semibold mb-2">Ask AI Assistant</h3>
-                <textarea
-                  className="w-full border rounded-md p-2 text-sm focus:outline-none"
-                  placeholder="Ask your question..."
-                  rows="4"
-                  value={aiQuestion}
-                  onChange={(e) => setAiQuestion(e.target.value)}
-                  onKeyDown={handleAiKeyDown}
-                ></textarea>
-                <button
-                  type="button"
-                  onClick={askAI}
-                  className="mt-2 w-full bg-blue-500 text-white text-sm py-2 rounded-md hover:bg-blue-600"
-                >
-                  Send
-                </button>
-                <div className="mt-2 p-2 text-sm bg-gray-50 border rounded min-h-[50px] flex items-center justify-center">
-                  {aiLoading ? (
-                    <div className="animate-spin border-2 border-gray-300 border-t-blue-500 w-5 h-5 rounded-full"></div>
-                  ) : (
-                    aiResponse
-                  )}
+              <div className="absolute bottom-12 right-16 w-96 h-96 bg-white shadow-lg rounded-md border z-50 flex flex-col">
+                <div className="flex items-center justify-between p-3 border-b">
+                  <h3 className="text-sm font-semibold">AI Assistant</h3>
+                  <button
+                    onClick={() => setShowAIAssistant(false)}
+                    className="text-gray-500 hover:text-gray-700 text-lg font-bold"
+                  >
+                    ×
+                  </button>
+                </div>
+                
+                <div className="flex-grow flex flex-col overflow-hidden">
+                  <div className="flex-grow overflow-y-auto p-3 bg-gray-50">
+                    {aiLoading ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="animate-spin border-2 border-gray-300 border-t-blue-500 w-5 h-5 rounded-full"></div>
+                      </div>
+                    ) : aiResponse ? (
+                      <div className="text-sm text-gray-700 whitespace-pre-wrap">
+                        {aiResponse}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400 text-center">
+                        AI response will appear here...
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="p-3 border-t bg-white">
+                    <textarea
+                      className="w-full border rounded-md p-2 text-sm focus:outline-none focus:border-blue-500 resize-none"
+                      placeholder="Ask your question..."
+                      rows="3"
+                      value={aiQuestion}
+                      onChange={(e) => setAiQuestion(e.target.value)}
+                      onKeyDown={handleAiKeyDown}
+                    ></textarea>
+                    <button
+                      type="button"
+                      onClick={askAI}
+                      disabled={aiLoading || !aiQuestion.trim()}
+                      className="mt-2 w-full bg-blue-500 text-white text-sm py-2 rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {aiLoading ? "Sending..." : "Send"}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

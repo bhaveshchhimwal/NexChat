@@ -159,25 +159,6 @@ app.get('/messages/:userId', async (req, res) => {
   }
 });
 
-// ---------------- Delete Message ----------------
-app.delete('/messages/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const message = await Message.findById(id);
-    if (!message) return res.status(404).json({ message: 'Message not found' });
-
-    message.text = 'Message deleted';
-    message.deleted = true;
-    message.file = null;
-    await message.save();
-
-    res.json({ message: 'Message deleted' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
 // ---------------- People ----------------
 app.get('/people', async (req, res) => {
   try {
@@ -237,33 +218,6 @@ wss.on('connection', (connection, req) => {
     try {
       const messageData = JSON.parse(message.toString());
 
-      if (messageData.type === 'delete') {
-        const { messageId, recipient } = messageData;
-        const messageDoc = await Message.findById(messageId);
-        if (messageDoc) {
-          messageDoc.text = 'Message deleted';
-          messageDoc.deleted = true;
-          messageDoc.file = null;
-          await messageDoc.save();
-
-          [...wss.clients]
-            .filter(
-              (c) =>
-                c.userId === recipient || c.userId === messageDoc.sender.toString()
-            )
-            .forEach((c) =>
-              c.send(
-                JSON.stringify({
-                  type: 'delete',
-                  messageId,
-                  text: 'Message deleted',
-                })
-              )
-            );
-        }
-        return;
-      }
-
       const { recipient, text, file } = messageData;
       let fileUrl = null;
 
@@ -279,14 +233,14 @@ wss.on('connection', (connection, req) => {
           sender: connection.userId,
           recipient,
           text,
-          file: file ? file.name : null, // The client needs the original file name, not the URL
+          file: file ? file.name : null,
         });
-        
+
         const broadcastPayload = {
           text,
           sender: connection.userId,
           recipient,
-          file: file ? fileUrl : null, // The client needs the URL here for display
+          file: file ? fileUrl : null,
           _id: messageDoc._id,
         };
 
