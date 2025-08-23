@@ -56,6 +56,43 @@ app.get('/messages/:userId', async (req,res) => {
   res.json(messages);
 });
 
+// 🆕 DELETE (actually soft delete) message route
+app.delete('/messages/:id', async (req, res) => {
+  try {
+    const userData = await getUserDataFromRequest(req);
+    const { id } = req.params;
+
+    const message = await Message.findById(id);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // Ensure only sender can delete
+    if (message.sender.toString() !== userData.userId) {
+      return res.status(403).json({ message: "Not authorized to delete this message" });
+    }
+
+    // Instead of removing, mark as deleted
+    message.text = "Message deleted";
+    message.deleted = true;
+    await message.save();
+
+    // 🆕 Notify both sender & recipient in real-time
+    [...wss.clients]
+      .filter(c => c.userId === message.recipient.toString() || c.userId === message.sender.toString())
+      .forEach(c => c.send(JSON.stringify({
+        type: 'delete',
+        messageId: id,
+        text: "Message deleted"
+      })));
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 app.get('/people', async (req,res) => {
   const users = await User.find({}, {'_id':1,username:1});
   res.json(users);
@@ -111,7 +148,6 @@ app.post('/register', async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    // Check if user already exists
     const existingUser = await User.findOne({ username });
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
@@ -151,7 +187,6 @@ wss.on('connection', (connection, req) => {
     });
   }
 
-  // ✅ Removed heartbeat logic (no ping/pong needed for browser clients)
   connection.isAlive = true;
 
   // read username and id from the cookie for this connection
@@ -173,6 +208,10 @@ wss.on('connection', (connection, req) => {
 
   connection.on('message', async (message) => {
     const messageData = JSON.parse(message.toString());
+
+    // 🆕 Ignore "delete" messages from frontend here, handled by REST
+    if (messageData.type === 'delete') return;
+
     const {recipient, text, file} = messageData;
     let filename = null;
     if (file) {
@@ -181,7 +220,7 @@ wss.on('connection', (connection, req) => {
       const ext = parts[parts.length - 1];
       filename = Date.now() + '.'+ext;
       const path = __dirname + '/uploads/' + filename;
-      const bufferData = new Buffer(file.data.split(',')[1], 'base64');
+      const bufferData = Buffer.from(file.data.split(',')[1], 'base64');
       fs.writeFile(path, bufferData, () => {
         console.log('file saved:'+path);
       });
@@ -206,6 +245,5 @@ wss.on('connection', (connection, req) => {
     }
   });
 
-  // notify everyone about online people (when someone connects)
   notifyAboutOnlinePeople();
 });
