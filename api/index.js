@@ -39,7 +39,6 @@ async function getUserDataFromRequest(req) {
       reject('no token');
     }
   });
-
 }
 
 app.get('/test', (req,res) => {
@@ -107,6 +106,7 @@ app.post('/login', async (req, res) => {
 app.post('/logout', (req,res) => {
   res.cookie('token', '', {sameSite:'none', secure:true}).json('ok');
 });
+
 app.post('/register', async (req, res) => {
   const { username, password } = req.body;
 
@@ -137,6 +137,7 @@ app.post('/register', async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
 const server = app.listen(4040);
 
 const wss = new ws.WebSocketServer({server});
@@ -150,24 +151,10 @@ wss.on('connection', (connection, req) => {
     });
   }
 
+  // ✅ Removed heartbeat logic (no ping/pong needed for browser clients)
   connection.isAlive = true;
 
-  connection.timer = setInterval(() => {
-    connection.ping();
-    connection.deathTimer = setTimeout(() => {
-      connection.isAlive = false;
-      clearInterval(connection.timer);
-      connection.terminate();
-      notifyAboutOnlinePeople();
-      console.log('dead');
-    }, 1000);
-  }, 5000);
-
-  connection.on('pong', () => {
-    clearTimeout(connection.deathTimer);
-  });
-
-  // read username and id form the cookie for this connection
+  // read username and id from the cookie for this connection
   const cookies = req.headers.cookie;
   if (cookies) {
     const tokenCookieString = cookies.split(';').find(str => str.startsWith('token='));

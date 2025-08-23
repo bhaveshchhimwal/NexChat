@@ -1,25 +1,26 @@
-import Avatar from "./Avatar.jsx";
+export default function Avatar({ userId, username, online }) {
+  const colors = [
+    "bg-teal-200", "bg-red-200", "bg-green-200", "bg-purple-200",
+    "bg-blue-200", "bg-yellow-200", "bg-orange-200", "bg-pink-200",
+    "bg-fuchsia-200", "bg-rose-200"
+  ];
 
-export default function Contact({ id, username, onClick, selected, online }) {
+  // Fallbacks
+  const safeUserId = userId || "000000000000000000000000"; // dummy ObjectId
+  const userIdBase10 = parseInt(safeUserId.substring(10), 16) || 0;
+  const colorIndex = userIdBase10 % colors.length;
+  const color = colors[colorIndex];
+
+  const displayLetter = username && username.length > 0 ? username[0].toUpperCase() : "?";
+
   return (
-    <div
-      key={id}
-      onClick={() => onClick(id)}
-      className={`flex items-center gap-4 p-4 cursor-pointer rounded-lg transition
-        ${selected ? "bg-blue-100" : "hover:bg-gray-100"}`}
-    >
-      <Avatar online={online} username={username} userId={id} size="md" />
-
-      {/* Username */}
-      <span
-        className={`text-xl font-bold text-gray-600 tracking-wide 
-        ${selected ? "text-gray-800" : ""}`}
-        style={{
-          textShadow: "0px 2px 3px rgba(0,0,0,0.2)", // stronger but still soft
-        }}
-      >
-        {username}
-      </span>
+    <div className={"w-8 h-8 relative rounded-full flex items-center " + color}>
+      <div className="text-center w-full opacity-70">{displayLetter}</div>
+      {online ? (
+        <div className="absolute w-3 h-3 bg-green-400 bottom-0 right-0 rounded-full border border-white"></div>
+      ) : (
+        <div className="absolute w-3 h-3 bg-gray-400 bottom-0 right-0 rounded-full border border-white"></div>
+      )}
     </div>
   );
 }
