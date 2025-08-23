@@ -140,8 +140,64 @@ app.post('/logout', (req, res) => {
   res.cookie('token', '', { sameSite: isDev ? 'lax' : 'none', secure: !isDev }).json('ok');
 });
 
-// ---------------- Other routes unchanged ----------------
-// messages/:id, messages/:userId, people, profile, etc. remain the same
+// ---------------- Messages with a User ----------------
+app.get('/messages/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const userData = await getUserDataFromRequest(req);
+    const ourUserId = userData.userId;
+
+    const messages = await Message.find({
+      sender: { $in: [userId, ourUserId] },
+      recipient: { $in: [userId, ourUserId] },
+    }).sort({ createdAt: 1 });
+
+    res.json(messages);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ---------------- Delete Message ----------------
+app.delete('/messages/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const message = await Message.findById(id);
+    if (!message) return res.status(404).json({ message: 'Message not found' });
+
+    message.text = 'Message deleted';
+    message.deleted = true;
+    message.file = null;
+    await message.save();
+
+    res.json({ message: 'Message deleted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ---------------- People ----------------
+app.get('/people', async (req, res) => {
+  try {
+    const users = await User.find({}, { _id: 1, username: 1 });
+    res.json(users);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ---------------- Profile ----------------
+app.get('/profile', async (req, res) => {
+  try {
+    const userData = await getUserDataFromRequest(req);
+    res.json(userData);
+  } catch (err) {
+    res.status(401).json({ error: 'No token or invalid token' });
+  }
+});
 
 // ---------------- WebSocket ----------------
 const server = app.listen(4040);

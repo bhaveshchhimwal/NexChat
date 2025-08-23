@@ -19,8 +19,8 @@ export default function Chat() {
   const [newMessageText, setNewMessageText] = useState("");
   const [messages, setMessages] = useState([]);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
-  const [aiQuestion, setAiQuestion] = useState("");       // ✅ AI question
-  const [aiResponse, setAiResponse] = useState("");       // ✅ AI response
+  const [aiQuestion, setAiQuestion] = useState("");
+  const [aiResponse, setAiResponse] = useState("");
   const { username, id, setId, setUsername } = useContext(UserContext);
   const divUnderMessages = useRef();
 
@@ -66,7 +66,10 @@ export default function Chat() {
       showOnlinePeople(messageData.online);
     } else if ("text" in messageData || "file" in messageData) {
       if (messageData.sender === selectedUserId || messageData.sender === id) {
-        setMessages((prev) => [...prev, { ...messageData }]);
+        setMessages((prev) => {
+          if (prev.some((m) => m._id === messageData._id)) return prev; // ✅ avoid duplicates
+          return [...prev, messageData];
+        });
       }
     } else if (messageData.type === "delete") {
       setMessages((prev) =>
@@ -99,17 +102,6 @@ export default function Chat() {
         file,
       })
     );
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        text: newMessageText,
-        sender: id,
-        recipient: selectedUserId,
-        file: file ? file.data : null,
-        _id: Date.now(),
-      },
-    ]);
 
     setNewMessageText("");
   }
@@ -173,11 +165,9 @@ export default function Chat() {
     }
   }
 
-  // ✅ Ask AI function (fixed)
   async function askAI() {
     if (!aiQuestion.trim()) return;
     try {
-      // ⚡ Use 'message' key to match backend
       const res = await axios.post("/api/ai", { message: aiQuestion });
       setAiResponse(res.data.reply);
     } catch (err) {
@@ -215,14 +205,14 @@ export default function Chat() {
         </div>
         <div className="p-2 text-center flex items-center justify-center">
           <span className="mr-2 text-sm text-gray-600 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-              <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
-            </svg>
             {username}
           </span>
           <button
             onClick={logout}
-            className="text-sm bg-blue-100 py-1 px-2 text-gray-500 border rounded-sm">logout</button>
+            className="text-sm bg-blue-100 py-1 px-2 text-gray-500 border rounded-sm"
+          >
+            logout
+          </button>
         </div>
       </div>
 
@@ -320,7 +310,6 @@ export default function Chat() {
               className="bg-white flex-grow border rounded-sm p-2"
             />
 
-            {/* AI Assistant button */}
             <button
               type="button"
               onClick={() => setShowAIAssistant((prev) => !prev)}
@@ -341,7 +330,6 @@ export default function Chat() {
               ➤
             </button>
 
-            {/* AI Popup card */}
             {showAIAssistant && (
               <div className="absolute bottom-12 right-16 w-64 bg-white shadow-lg rounded-md p-3 border">
                 <h3 className="text-sm font-semibold mb-2">Ask AI Assistant</h3>
@@ -359,8 +347,6 @@ export default function Chat() {
                 >
                   Send
                 </button>
-
-                {/* ✅ Show AI response */}
                 {aiResponse && (
                   <div className="mt-2 p-2 text-sm bg-gray-50 border rounded">
                     {aiResponse}
