@@ -9,6 +9,7 @@ const User = require('./models/User');
 const Message = require('./models/Message');
 const ws = require('ws');
 const cloudinary = require('cloudinary').v2;
+const path = require('path'); // Added
 
 dotenv.config();
 
@@ -35,6 +36,11 @@ app.use(cors({
 }));
 
 const isDev = process.env.NODE_ENV !== 'production';
+
+// ---------------- Serve React Build (Added) ----------------
+if (!isDev) {
+  app.use(express.static(path.join(__dirname, '../client/build')));
+}
 
 // ---------------- Helper ----------------
 async function getUserDataFromRequest(req) {
@@ -180,8 +186,15 @@ app.get('/profile', async (req, res) => {
   }
 });
 
+// ---------------- Catch All Handler (Added) ----------------
+if (!isDev) {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+  });
+}
+
 // ---------------- WebSocket ----------------
-const server = app.listen(4040);
+const server = app.listen(process.env.PORT || 4040); // Changed port
 const wss = new ws.WebSocketServer({ server });
 
 wss.on('connection', (connection, req) => {
