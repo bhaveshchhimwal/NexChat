@@ -21,6 +21,7 @@ export default function Chat() {
   const [aiQuestion, setAiQuestion] = useState("");
   const [aiResponse, setAiResponse] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   const { username, id, setId, setUsername } = useContext(UserContext);
   const divUnderMessages = useRef();
 
@@ -185,19 +186,77 @@ export default function Chat() {
     }
   }
 
+  // Close sidebar when selecting a user on mobile
+  function selectUser(userId) {
+    setSelectedUserId(userId);
+    if (window.innerWidth < 768) {
+      setShowSidebar(false);
+    }
+  }
+
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen relative">
+      {/* Mobile Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b z-30 p-3 flex items-center justify-between">
+        <button
+          onClick={() => setShowSidebar(true)}
+          className="p-2 text-gray-600"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
+        <span className="font-medium text-gray-800">
+          {selectedUserId ? (onlinePeople[selectedUserId] || offlinePeople[selectedUserId]?.username) : 'Chat'}
+        </span>
+        <button
+          onClick={logout}
+          className="text-sm bg-blue-100 py-1 px-2 text-gray-500 border rounded-sm"
+        >
+          logout
+        </button>
+      </div>
+
+      {/* Sidebar Overlay for Mobile */}
+      {showSidebar && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          onClick={() => setShowSidebar(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className="bg-white w-1/3 flex flex-col">
-        <div className="flex-grow">
-          <Logo />
+      <div className={`bg-white flex flex-col transition-transform duration-300 ease-in-out z-50
+        md:relative md:w-1/3 md:translate-x-0
+        ${showSidebar 
+          ? 'fixed inset-y-0 left-0 w-80 translate-x-0' 
+          : 'fixed inset-y-0 left-0 w-80 -translate-x-full md:translate-x-0'
+        }`}>
+        
+        {/* Mobile sidebar header */}
+        <div className="md:hidden flex items-center justify-between p-4 border-b">
+          <div className="flex items-center">
+            <Logo />
+          </div>
+          <button
+            onClick={() => setShowSidebar(false)}
+            className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="flex-grow overflow-y-auto">
+          <div className="hidden md:block">
+            <Logo />
+          </div>
           {Object.keys(onlinePeopleExclOurUser).map((userId) => (
             <Contact
               key={userId}
               id={userId}
               online={true}
               username={onlinePeopleExclOurUser[userId]}
-              onClick={() => setSelectedUserId(userId)}
+              onClick={() => selectUser(userId)}
               selected={userId === selectedUserId}
             />
           ))}
@@ -207,12 +266,13 @@ export default function Chat() {
               id={userId}
               online={false}
               username={offlinePeople[userId].username}
-              onClick={() => setSelectedUserId(userId)}
+              onClick={() => selectUser(userId)}
               selected={userId === selectedUserId}
             />
           ))}
         </div>
-         <div className="p-2 text-center flex items-center justify-center">
+        
+        <div className="hidden md:flex p-2 text-center items-center justify-center">
           <span className="mr-2 text-sm text-gray-600 flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
               <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
@@ -226,12 +286,13 @@ export default function Chat() {
       </div>
 
       {/* Chat window */}
-      <div className="flex flex-col bg-blue-50 w-2/3 p-2 relative">
+      <div className="flex flex-col bg-blue-50 w-full md:w-2/3 p-2 md:p-2 relative pt-16 md:pt-2">
         <div className="flex-grow">
           {!selectedUserId && (
             <div className="flex h-full flex-grow items-center justify-center">
-              <div className="text-gray-300">
-                &larr; Select a person from the sidebar
+              <div className="text-gray-300 text-center px-4">
+                <div className="md:hidden mb-2">Tap the menu button to select a contact</div>
+                <div className="hidden md:block">&larr; Select a person from the sidebar</div>
               </div>
             </div>
           )}
@@ -249,11 +310,12 @@ export default function Chat() {
                   >
                     <div
                       className={
-                        "inline-block p-2 rounded-md text-sm max-w-xs " +
+                        "inline-block p-2 rounded-md text-sm max-w-xs md:max-w-xs " +
                         (message.sender === id
                           ? "bg-blue-500 text-white"
                           : "bg-white text-gray-500")
                       }
+                      style={{ maxWidth: 'calc(100% - 2rem)' }}
                     >
                       {message.text && message.text.trim() && (
                         <div className={message.file ? "mb-2" : ""}>
@@ -275,7 +337,7 @@ export default function Chat() {
                                   : axios.defaults.baseURL + "/uploads/" + message.file
                               }
                               alt="shared image"
-                              className="max-w-xs rounded cursor-pointer block"
+                              className="max-w-48 max-h-64 rounded cursor-pointer block object-cover"
                               onClick={() => window.open(
                                 message.file.startsWith("http")
                                   ? message.file
@@ -319,7 +381,7 @@ export default function Chat() {
               value={newMessageText}
               onChange={(ev) => setNewMessageText(ev.target.value)}
               placeholder="Type your message here"
-              className="bg-white flex-grow border rounded-sm p-2"
+              className="bg-white flex-grow border rounded-sm p-2 text-sm md:text-base"
             />
 
             <button
@@ -328,22 +390,24 @@ export default function Chat() {
               className="bg-blue-200 p-2 text-gray-600 rounded-sm border border-blue-200 flex items-center justify-center hover:bg-blue-300 transition-colors"
               title="AI Assistant"
             >
-              <img src={aiLogo} alt="AI Assistant" className="w-5 h-5" />
+              <img src={aiLogo} alt="AI Assistant" className="w-4 h-4 md:w-5 md:h-5" />
             </button>
 
             <label className="bg-blue-200 p-2 text-gray-600 cursor-pointer rounded-sm border border-blue-200 hover:bg-blue-300 transition-colors">
               <input type="file" className="hidden" onChange={sendFile} />
-              📎
+              <span className="text-sm md:text-base">📎</span>
             </label>
             <button
               type="submit"
               className="bg-blue-500 p-2 text-white rounded-sm hover:bg-blue-600 transition-colors"
             >
-              ➤
+              <span className="text-sm md:text-base">➤</span>
             </button>
 
             {showAIAssistant && (
-              <div className="absolute bottom-12 right-16 w-96 h-96 bg-white shadow-lg rounded-md border z-50 flex flex-col">
+              <div className={`absolute bottom-12 z-50 bg-white shadow-lg rounded-md border flex flex-col
+                right-0 w-full max-w-sm h-80
+                md:right-16 md:w-96 md:h-96`}>
                 <div className="flex items-center justify-between p-3 border-b">
                   <h3 className="text-sm font-semibold">AI Assistant</h3>
                   <button
@@ -375,7 +439,7 @@ export default function Chat() {
                     <textarea
                       className="w-full border rounded-md p-2 text-sm focus:outline-none focus:border-blue-500 resize-none"
                       placeholder="Ask your question..."
-                      rows="3"
+                      rows="2"
                       value={aiQuestion}
                       onChange={(e) => setAiQuestion(e.target.value)}
                       onKeyDown={handleAiKeyDown}
@@ -397,4 +461,4 @@ export default function Chat() {
       </div>
     </div>
   );
-} 
+}
