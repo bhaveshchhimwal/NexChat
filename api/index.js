@@ -11,7 +11,7 @@ const ws = require('ws');
 const cloudinary = require('cloudinary').v2;
 const path = require('path');
 
-dotenv.config();
+require('@dotenvx/dotenvx').config()
 
 // ---------------- Cloudinary ----------------
 cloudinary.config({
