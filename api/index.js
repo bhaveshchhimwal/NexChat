@@ -13,6 +13,23 @@ const path = require('path');
 
 dotenv.config();
 
+// Add debugging logs
+console.log('🚀 Starting server...');
+console.log('📊 Environment:', process.env.NODE_ENV);
+console.log('🔗 MongoDB URL exists:', !!process.env.MONGO_URL);
+console.log('🔐 JWT Secret exists:', !!process.env.JWT_SECRET);
+
+// Add global error handlers
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
 // ---------------- Cloudinary ----------------
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -21,7 +38,24 @@ cloudinary.config({
 });
 
 // ---------------- Mongo ----------------
-mongoose.connect(process.env.MONGO_URL);
+console.log('📦 Connecting to MongoDB...');
+mongoose.connect(process.env.MONGO_URL)
+  .then(() => {
+    console.log('✅ MongoDB connected successfully');
+  })
+  .catch((error) => {
+    console.error('❌ MongoDB connection failed:', error);
+    process.exit(1);
+  });
+
+// Handle mongoose connection events
+mongoose.connection.on('error', (error) => {
+  console.error('❌ MongoDB connection error:', error);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('⚠️ MongoDB disconnected');
+});
 
 const jwtSecret = process.env.JWT_SECRET;
 const bcryptSalt = bcrypt.genSaltSync(10);
@@ -52,7 +86,10 @@ async function getUserDataFromRequest(req) {
 }
 
 // ---------------- Routes ----------------
-app.get('/test', (req, res) => res.json('ok'));
+app.get('/test', (req, res) => {
+  console.log('🧪 Test route hit');
+  res.json('ok');
+});
 
 app.post('/api/ai', async (req, res) => {
   try {
@@ -110,10 +147,10 @@ app.post('/login', async (req, res) => {
           secure: !isDev,
           httpOnly: true,
         })
-        .json({ id: foundUser._id, username: foundUser.username }); // Added username here
+        .json({ id: foundUser._id, username: foundUser.username });
     });
   } catch (error) {
-    console.error(error); // Log the specific error
+    console.error('Login error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -137,10 +174,10 @@ app.post('/register', async (req, res) => {
           httpOnly: true,
         })
         .status(201)
-        .json({ id: createdUser._id, username: createdUser.username }); // Added username here
+        .json({ id: createdUser._id, username: createdUser.username });
     });
   } catch (error) {
-    console.error(error); // Log the specific error
+    console.error('Register error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -163,17 +200,17 @@ app.get('/messages/:userId', async (req, res) => {
 
     res.json(messages);
   } catch (err) {
-    console.error(err);
+    console.error('Messages error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 app.get('/people', async (req, res) => {
-  try { // Fix: Added try-catch for robustness
+  try {
     const users = await User.find({}, { _id: 1, username: 1 });
     res.json(users);
   } catch (err) {
-    console.error(err);
+    console.error('People error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -198,80 +235,94 @@ if (!isDev) {
 }
 
 // ---------------- WebSocket ----------------
-// Fix: Moved server setup into the MongoDB connection promise to ensure DB is ready
-mongoose.connection.once('open', () => {
-  console.log("Database connection is open, starting server...");
-  const server = app.listen(process.env.PORT || 4040, () => {
-    console.log(`Server is listening on port ${process.env.PORT || 4040}`);
+const PORT = process.env.PORT || 4040;
+console.log(`🚀 Starting server on port ${PORT}...`);
+
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Server is running on port ${PORT}`);
+});
+
+const wss = new ws.WebSocketServer({ server });
+console.log('🔌 WebSocket server initialized');
+
+wss.on('connection', (connection, req) => {
+  console.log('👤 New WebSocket connection');
+
+  function notifyAboutOnlinePeople() {
+    [...wss.clients].forEach((client) => {
+      client.send(
+        JSON.stringify({
+          online: [...wss.clients].map((c) => ({
+            userId: c.userId,
+            username: c.username,
+          })),
+        })
+      );
+    });
+  }
+
+  const cookies = req.headers.cookie;
+  if (cookies) {
+    const tokenCookieString = cookies.split(';').find((str) => str.startsWith('token='));
+    if (tokenCookieString) {
+      const token = tokenCookieString.split('=')[1];
+      if (token) {
+        jwt.verify(token, jwtSecret, {}, (err, userData) => {
+          if (!err) {
+            connection.userId = userData.userId;
+            connection.username = userData.username;
+            console.log(`✅ WebSocket authenticated: ${userData.username}`);
+          }
+        });
+      }
+    }
+  }
+
+  connection.on('message', async (message) => {
+    try {
+      const messageData = JSON.parse(message.toString());
+
+      const { recipient, text, file } = messageData;
+      let fileUrl = null;
+
+      if (file) {
+        const uploadResult = await cloudinary.uploader.upload(file.data, {
+          folder: 'chat_app',
+        });
+        fileUrl = uploadResult.secure_url;
+      }
+
+      if (recipient && (text || file)) {
+        const messageDoc = await Message.create({
+          sender: connection.userId,
+          recipient,
+          text,
+          file: file ? fileUrl : null,
+        });
+
+        const broadcastPayload = {
+          text,
+          sender: connection.userId,
+          recipient,
+          file: file ? fileUrl : null,
+          _id: messageDoc._id,
+        };
+
+        [...wss.clients]
+          .filter((c) => c.userId === recipient || c.userId === connection.userId)
+          .forEach((c) => c.send(JSON.stringify(broadcastPayload)));
+      }
+    } catch (error) {
+      console.error('❌ Error handling WebSocket message:', error);
+    }
   });
-  const wss = new ws.WebSocketServer({ server });
 
-  wss.on('connection', (connection, req) => {
-    function notifyAboutOnlinePeople() {
-      // Logic for notifying online people
-    }
-    // Connection logic
-    const cookies = req.headers.cookie;
-    if (cookies) {
-      const tokenCookieString = cookies.split(';').find((str) => str.startsWith('token='));
-      if (tokenCookieString) {
-        const token = tokenCookieString.split('=')[1];
-        if (token) {
-          jwt.verify(token, jwtSecret, {}, (err, userData) => {
-            if (!err) {
-              connection.userId = userData.userId;
-              connection.username = userData.username;
-              notifyAboutOnlinePeople();
-            }
-          });
-        }
-      }
-    }
-
-    connection.on('message', async (message) => {
-      try {
-        const messageData = JSON.parse(message.toString());
-
-        const { recipient, text, file } = messageData;
-        let fileUrl = null;
-
-        if (file) {
-          const uploadResult = await cloudinary.uploader.upload(file.data, {
-            folder: 'chat_app',
-          });
-          fileUrl = uploadResult.secure_url;
-        }
-
-        if (recipient && (text || file)) {
-          const messageDoc = await Message.create({
-            sender: connection.userId,
-            recipient,
-            text,
-            file: file ? fileUrl : null,
-          });
-
-          const broadcastPayload = {
-            text,
-            sender: connection.userId,
-            recipient,
-            file: file ? fileUrl : null,
-            _id: messageDoc._id,
-          };
-
-          [...wss.clients]
-            .filter((c) => c.userId === recipient || c.userId === connection.userId)
-            .forEach((c) => c.send(JSON.stringify(broadcastPayload)));
-        }
-      } catch (error) {
-        console.error('Error handling WebSocket message:', error);
-      }
-    });
-
-    connection.on('close', () => {
-      notifyAboutOnlinePeople();
-    });
-
-    // Initial notification
+  connection.on('close', () => {
+    console.log('👋 WebSocket connection closed');
     notifyAboutOnlinePeople();
   });
+
+  notifyAboutOnlinePeople();
 });
+
+console.log('🎉 Server setup complete!');
