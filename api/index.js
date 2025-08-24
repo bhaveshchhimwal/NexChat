@@ -9,7 +9,7 @@ const User = require('./models/User');
 const Message = require('./models/Message');
 const ws = require('ws');
 const cloudinary = require('cloudinary').v2;
-const path = require('path'); // Added
+const path = require('path');
 
 dotenv.config();
 
@@ -30,17 +30,14 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-app.use(cors({ 
-  credentials: true, 
-  origin: process.env.CLIENT_URL 
-}));
-
 const isDev = process.env.NODE_ENV !== 'production';
 
-// ---------------- Serve React Build (Added) ----------------
-if (!isDev) {
-  app.use(express.static(path.join(__dirname, '../client/build')));
-}
+app.use(
+  cors({
+    credentials: true,
+    origin: process.env.CLIENT_URL,
+  })
+);
 
 // ---------------- Helper ----------------
 async function getUserDataFromRequest(req) {
@@ -57,7 +54,6 @@ async function getUserDataFromRequest(req) {
 // ---------------- Routes ----------------
 app.get('/test', (req, res) => res.json('ok'));
 
-// ---------- Gemini AI Route ----------
 app.post('/api/ai', async (req, res) => {
   try {
     const { message } = req.body;
@@ -95,7 +91,7 @@ app.post('/api/ai', async (req, res) => {
   }
 });
 
-// ---------------- User Routes ----------------
+// ---------------- Auth Routes ----------------
 app.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -108,11 +104,13 @@ app.post('/login', async (req, res) => {
     jwt.sign({ userId: foundUser._id, username }, jwtSecret, {}, (err, token) => {
       if (err) return res.status(500).json({ message: 'JWT Error' });
 
-      res.cookie('token', token, {
-        sameSite: isDev ? 'lax' : 'none',
-        secure: !isDev,
-        httpOnly: true,
-      }).json({ id: foundUser._id });
+      res
+        .cookie('token', token, {
+          sameSite: isDev ? 'lax' : 'none',
+          secure: !isDev,
+          httpOnly: true,
+        })
+        .json({ id: foundUser._id });
     });
   } catch {
     res.status(500).json({ message: 'Server error' });
@@ -131,11 +129,14 @@ app.post('/register', async (req, res) => {
     jwt.sign({ userId: createdUser._id, username }, jwtSecret, {}, (err, token) => {
       if (err) return res.status(500).json({ message: 'JWT Error' });
 
-      res.cookie('token', token, {
-        sameSite: isDev ? 'lax' : 'none',
-        secure: !isDev,
-        httpOnly: true,
-      }).status(201).json({ id: createdUser._id });
+      res
+        .cookie('token', token, {
+          sameSite: isDev ? 'lax' : 'none',
+          secure: !isDev,
+          httpOnly: true,
+        })
+        .status(201)
+        .json({ id: createdUser._id });
     });
   } catch {
     res.status(500).json({ message: 'Server error' });
@@ -146,7 +147,7 @@ app.post('/logout', (req, res) => {
   res.cookie('token', '', { sameSite: isDev ? 'lax' : 'none', secure: !isDev }).json('ok');
 });
 
-// ---------------- Messages with a User ----------------
+// ---------------- Messages ----------------
 app.get('/messages/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -165,7 +166,6 @@ app.get('/messages/:userId', async (req, res) => {
   }
 });
 
-// ---------------- People ----------------
 app.get('/people', async (req, res) => {
   try {
     const users = await User.find({}, { _id: 1, username: 1 });
@@ -176,7 +176,6 @@ app.get('/people', async (req, res) => {
   }
 });
 
-// ---------------- Profile ----------------
 app.get('/profile', async (req, res) => {
   try {
     const userData = await getUserDataFromRequest(req);
@@ -186,15 +185,16 @@ app.get('/profile', async (req, res) => {
   }
 });
 
-// ---------------- Catch All Handler (Added) ----------------
+// ---------------- Serve React Build ----------------
 if (!isDev) {
+  app.use(express.static(path.join(__dirname, '../client/build')));
   app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
   });
 }
 
 // ---------------- WebSocket ----------------
-const server = app.listen(process.env.PORT || 4040); // Changed port
+const server = app.listen(process.env.PORT || 4040);
 const wss = new ws.WebSocketServer({ server });
 
 wss.on('connection', (connection, req) => {
@@ -242,27 +242,23 @@ wss.on('connection', (connection, req) => {
       }
 
       if (recipient && (text || file)) {
-        // FIXED: Store Cloudinary URL in database instead of filename
         const messageDoc = await Message.create({
           sender: connection.userId,
           recipient,
           text,
-          file: file ? fileUrl : null, // ✅ Store the Cloudinary URL
+          file: file ? fileUrl : null,
         });
 
-        // FIXED: Broadcast the same Cloudinary URL
         const broadcastPayload = {
           text,
           sender: connection.userId,
           recipient,
-          file: file ? fileUrl : null, // ✅ Broadcast the Cloudinary URL
+          file: file ? fileUrl : null,
           _id: messageDoc._id,
         };
 
         [...wss.clients]
-          .filter(
-            (c) => c.userId === recipient || c.userId === connection.userId
-          )
+          .filter((c) => c.userId === recipient || c.userId === connection.userId)
           .forEach((c) => c.send(JSON.stringify(broadcastPayload)));
       }
     } catch (error) {
