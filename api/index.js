@@ -188,7 +188,9 @@ app.get('/profile', async (req, res) => {
 // ---------------- Serve React Build ----------------
 if (!isDev) {
   app.use(express.static(path.join(__dirname, '../client/build')));
-  app.get('*', (req, res) => {
+  
+  // Handle React Router routes - serve index.html for non-API routes
+  app.get(/^(?!\/api).*/, (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
   });
 }
