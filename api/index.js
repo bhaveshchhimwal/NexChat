@@ -1,3 +1,4 @@
+// ---------------- Imports ----------------
 const express = require('express');
 const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
@@ -9,26 +10,10 @@ const User = require('./models/User');
 const Message = require('./models/Message');
 const ws = require('ws');
 const cloudinary = require('cloudinary').v2;
-const path = require('path');
+const fetch = require('node-fetch'); // ✅ needed for Gemini API calls
+const path = require('path'); // ✅ added for serving React build
 
 dotenv.config();
-
-// Add debugging logs
-console.log('🚀 Starting server...');
-console.log('📊 Environment:', process.env.NODE_ENV);
-console.log('🔗 MongoDB URL exists:', !!process.env.MONGO_URL);
-console.log('🔐 JWT Secret exists:', !!process.env.JWT_SECRET);
-
-// Add global error handlers
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
 
 // ---------------- Cloudinary ----------------
 cloudinary.config({
@@ -38,24 +23,7 @@ cloudinary.config({
 });
 
 // ---------------- Mongo ----------------
-console.log('📦 Connecting to MongoDB...');
-mongoose.connect(process.env.MONGO_URL)
-  .then(() => {
-    console.log('✅ MongoDB connected successfully');
-  })
-  .catch((error) => {
-    console.error('❌ MongoDB connection failed:', error);
-    process.exit(1);
-  });
-
-// Handle mongoose connection events
-mongoose.connection.on('error', (error) => {
-  console.error('❌ MongoDB connection error:', error);
-});
-
-mongoose.connection.on('disconnected', () => {
-  console.log('⚠️ MongoDB disconnected');
-});
+mongoose.connect(process.env.MONGO_URL);
 
 const jwtSecret = process.env.JWT_SECRET;
 const bcryptSalt = bcrypt.genSaltSync(10);
@@ -64,14 +32,25 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-const isDev = process.env.NODE_ENV !== 'production';
+const allowedOrigins = [
+  'http://localhost:5173',
+  process.env.CLIENT_URL, // ✅ frontend hosted on Render or Vercel
+];
 
 app.use(
   cors({
     credentials: true,
-    origin: process.env.CLIENT_URL,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('CORS not allowed'));
+      }
+    },
   })
 );
+
+const isDev = process.env.NODE_ENV !== 'production';
 
 // ---------------- Helper ----------------
 async function getUserDataFromRequest(req) {
@@ -86,11 +65,9 @@ async function getUserDataFromRequest(req) {
 }
 
 // ---------------- Routes ----------------
-app.get('/test', (req, res) => {
-  console.log('🧪 Test route hit');
-  res.json('ok');
-});
+app.get('/test', (req, res) => res.json('ok'));
 
+// ---------- Gemini AI Route ----------
 app.post('/api/ai', async (req, res) => {
   try {
     const { message } = req.body;
@@ -103,7 +80,7 @@ app.post('/api/ai', async (req, res) => {
 
     const response = await fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' +
-      process.env.GEMINI_API_KEY,
+        process.env.GEMINI_API_KEY,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,7 +105,7 @@ app.post('/api/ai', async (req, res) => {
   }
 });
 
-// ---------------- Auth Routes ----------------
+// ---------------- User Routes ----------------
 app.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -147,10 +124,9 @@ app.post('/login', async (req, res) => {
           secure: !isDev,
           httpOnly: true,
         })
-        .json({ id: foundUser._id, username: foundUser.username });
+        .json({ id: foundUser._id });
     });
-  } catch (error) {
-    console.error('Login error:', error);
+  } catch {
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -174,16 +150,17 @@ app.post('/register', async (req, res) => {
           httpOnly: true,
         })
         .status(201)
-        .json({ id: createdUser._id, username: createdUser.username });
+        .json({ id: createdUser._id });
     });
-  } catch (error) {
-    console.error('Register error:', error);
+  } catch {
     res.status(500).json({ message: 'Server error' });
   }
 });
 
 app.post('/logout', (req, res) => {
-  res.cookie('token', '', { sameSite: isDev ? 'lax' : 'none', secure: !isDev }).json('ok');
+  res
+    .cookie('token', '', { sameSite: isDev ? 'lax' : 'none', secure: !isDev })
+    .json('ok');
 });
 
 // ---------------- Messages ----------------
@@ -200,21 +177,23 @@ app.get('/messages/:userId', async (req, res) => {
 
     res.json(messages);
   } catch (err) {
-    console.error('Messages error:', err);
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
+// ---------------- People ----------------
 app.get('/people', async (req, res) => {
   try {
     const users = await User.find({}, { _id: 1, username: 1 });
     res.json(users);
   } catch (err) {
-    console.error('People error:', err);
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
+// ---------------- Profile ----------------
 app.get('/profile', async (req, res) => {
   try {
     const userData = await getUserDataFromRequest(req);
@@ -224,30 +203,25 @@ app.get('/profile', async (req, res) => {
   }
 });
 
-// ---------------- Serve React Build ----------------
+// ---------------- Production: Serve React ----------------
 if (!isDev) {
-  app.use(express.static(path.join(__dirname, '../client/build')));
+  const clientPath = path.join(__dirname, "../client/dist"); // ✅ Vite builds to dist
+  app.use(express.static(clientPath));
 
-  // Handle React Router routes - serve index.html for non-API routes
-  app.get(/^(?!\/api).*/, (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(clientPath, "index.html"));
   });
 }
 
 // ---------------- WebSocket ----------------
 const PORT = process.env.PORT || 4040;
-console.log(`🚀 Starting server on port ${PORT}...`);
-
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server is running on port ${PORT}`);
+const server = app.listen(PORT, () => {
+  console.log('Server running on port ' + PORT);
 });
 
 const wss = new ws.WebSocketServer({ server });
-console.log('🔌 WebSocket server initialized');
 
 wss.on('connection', (connection, req) => {
-  console.log('👤 New WebSocket connection');
-
   function notifyAboutOnlinePeople() {
     [...wss.clients].forEach((client) => {
       client.send(
@@ -263,7 +237,9 @@ wss.on('connection', (connection, req) => {
 
   const cookies = req.headers.cookie;
   if (cookies) {
-    const tokenCookieString = cookies.split(';').find((str) => str.startsWith('token='));
+    const tokenCookieString = cookies
+      .split(';')
+      .find((str) => str.trim().startsWith('token='));
     if (tokenCookieString) {
       const token = tokenCookieString.split('=')[1];
       if (token) {
@@ -271,7 +247,6 @@ wss.on('connection', (connection, req) => {
           if (!err) {
             connection.userId = userData.userId;
             connection.username = userData.username;
-            console.log(`✅ WebSocket authenticated: ${userData.username}`);
           }
         });
       }
@@ -309,20 +284,15 @@ wss.on('connection', (connection, req) => {
         };
 
         [...wss.clients]
-          .filter((c) => c.userId === recipient || c.userId === connection.userId)
+          .filter(
+            (c) => c.userId === recipient || c.userId === connection.userId
+          )
           .forEach((c) => c.send(JSON.stringify(broadcastPayload)));
       }
     } catch (error) {
-      console.error('❌ Error handling WebSocket message:', error);
+      console.error('Error handling WebSocket message:', error);
     }
-  });
-
-  connection.on('close', () => {
-    console.log('👋 WebSocket connection closed');
-    notifyAboutOnlinePeople();
   });
 
   notifyAboutOnlinePeople();
 });
-
-console.log('🎉 Server setup complete!');
