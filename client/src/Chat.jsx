@@ -7,7 +7,10 @@ import axios from "axios";
 import Contact from "./Contact";
 import aiLogo from "./assets/generative.png";
 
-axios.defaults.baseURL = "http://localhost:4040";
+// CHANGE 1: Updated axios baseURL for production
+axios.defaults.baseURL = process.env.NODE_ENV === 'production' 
+  ? window.location.origin 
+  : "http://localhost:4040";
 axios.defaults.withCredentials = true;
 
 export default function Chat() {
@@ -54,12 +57,17 @@ export default function Chat() {
     }
   }, []);
 
-  // ---------------- WebSocket connection ----------------
+  // CHANGE 2: Updated WebSocket connection
   useEffect(() => {
     let ws;
 
     function connectToWs() {
-      ws = new WebSocket("ws://localhost:4040");
+      // Updated WebSocket URL for production
+      const wsUrl = process.env.NODE_ENV === 'production' 
+        ? `wss://${window.location.host}` 
+        : 'ws://localhost:4040';
+      
+      ws = new WebSocket(wsUrl);
 
       ws.addEventListener("open", () => {
         console.log("WebSocket connected");
