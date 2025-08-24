@@ -205,11 +205,11 @@ app.get('/profile', async (req, res) => {
 
 // ---------------- Production: Serve React ----------------
 if (!isDev) {
-  const clientPath = path.join(__dirname, "../client/dist"); // ✅ Vite builds to dist
+  const clientPath = path.resolve(__dirname, '../client/dist'); // ✅ FIX: safer path
   app.use(express.static(clientPath));
 
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(clientPath, "index.html"));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientPath, 'index.html'));
   });
 }
 
