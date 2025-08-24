@@ -1,7 +1,20 @@
 {
+  "name": "nexchat",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd client && npm install && npm run build",
+    "start": "cd api && npm start",
+    "dev": "concurrently \"cd api && npm run dev\" \"cd client && npm start\""
+  },
   "dependencies": {
     "cloudinary": "^1.41.3",
     "multer": "^2.0.2",
     "multer-storage-cloudinary": "^4.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^7.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
