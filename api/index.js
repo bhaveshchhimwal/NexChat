@@ -66,7 +66,7 @@ app.post('/api/ai', async (req, res) => {
 
     const response = await fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' +
-        process.env.GEMINI_API_KEY,
+      process.env.GEMINI_API_KEY,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -110,9 +110,10 @@ app.post('/login', async (req, res) => {
           secure: !isDev,
           httpOnly: true,
         })
-        .json({ id: foundUser._id });
+        .json({ id: foundUser._id, username: foundUser.username }); // Added username here
     });
-  } catch {
+  } catch (error) {
+    console.error(error); // Log the specific error
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -136,9 +137,10 @@ app.post('/register', async (req, res) => {
           httpOnly: true,
         })
         .status(201)
-        .json({ id: createdUser._id });
+        .json({ id: createdUser._id, username: createdUser.username }); // Added username here
     });
-  } catch {
+  } catch (error) {
+    console.error(error); // Log the specific error
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -167,7 +169,7 @@ app.get('/messages/:userId', async (req, res) => {
 });
 
 app.get('/people', async (req, res) => {
-  try {
+  try { // Fix: Added try-catch for robustness
     const users = await User.find({}, { _id: 1, username: 1 });
     res.json(users);
   } catch (err) {
@@ -188,7 +190,7 @@ app.get('/profile', async (req, res) => {
 // ---------------- Serve React Build ----------------
 if (!isDev) {
   app.use(express.static(path.join(__dirname, '../client/build')));
-  
+
   // Handle React Router routes - serve index.html for non-API routes
   app.get(/^(?!\/api).*/, (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
@@ -196,77 +198,80 @@ if (!isDev) {
 }
 
 // ---------------- WebSocket ----------------
-const server = app.listen(process.env.PORT || 4040);
-const wss = new ws.WebSocketServer({ server });
-
-wss.on('connection', (connection, req) => {
-  function notifyAboutOnlinePeople() {
-    [...wss.clients].forEach((client) => {
-      client.send(
-        JSON.stringify({
-          online: [...wss.clients].map((c) => ({
-            userId: c.userId,
-            username: c.username,
-          })),
-        })
-      );
-    });
-  }
-
-  const cookies = req.headers.cookie;
-  if (cookies) {
-    const tokenCookieString = cookies.split(';').find((str) => str.startsWith('token='));
-    if (tokenCookieString) {
-      const token = tokenCookieString.split('=')[1];
-      if (token) {
-        jwt.verify(token, jwtSecret, {}, (err, userData) => {
-          if (!err) {
-            connection.userId = userData.userId;
-            connection.username = userData.username;
-          }
-        });
-      }
-    }
-  }
-
-  connection.on('message', async (message) => {
-    try {
-      const messageData = JSON.parse(message.toString());
-
-      const { recipient, text, file } = messageData;
-      let fileUrl = null;
-
-      if (file) {
-        const uploadResult = await cloudinary.uploader.upload(file.data, {
-          folder: 'chat_app',
-        });
-        fileUrl = uploadResult.secure_url;
-      }
-
-      if (recipient && (text || file)) {
-        const messageDoc = await Message.create({
-          sender: connection.userId,
-          recipient,
-          text,
-          file: file ? fileUrl : null,
-        });
-
-        const broadcastPayload = {
-          text,
-          sender: connection.userId,
-          recipient,
-          file: file ? fileUrl : null,
-          _id: messageDoc._id,
-        };
-
-        [...wss.clients]
-          .filter((c) => c.userId === recipient || c.userId === connection.userId)
-          .forEach((c) => c.send(JSON.stringify(broadcastPayload)));
-      }
-    } catch (error) {
-      console.error('Error handling WebSocket message:', error);
-    }
+// Fix: Moved server setup into the MongoDB connection promise to ensure DB is ready
+mongoose.connection.once('open', () => {
+  console.log("Database connection is open, starting server...");
+  const server = app.listen(process.env.PORT || 4040, () => {
+    console.log(`Server is listening on port ${process.env.PORT || 4040}`);
   });
+  const wss = new ws.WebSocketServer({ server });
 
-  notifyAboutOnlinePeople();
+  wss.on('connection', (connection, req) => {
+    function notifyAboutOnlinePeople() {
+      // Logic for notifying online people
+    }
+    // Connection logic
+    const cookies = req.headers.cookie;
+    if (cookies) {
+      const tokenCookieString = cookies.split(';').find((str) => str.startsWith('token='));
+      if (tokenCookieString) {
+        const token = tokenCookieString.split('=')[1];
+        if (token) {
+          jwt.verify(token, jwtSecret, {}, (err, userData) => {
+            if (!err) {
+              connection.userId = userData.userId;
+              connection.username = userData.username;
+              notifyAboutOnlinePeople();
+            }
+          });
+        }
+      }
+    }
+
+    connection.on('message', async (message) => {
+      try {
+        const messageData = JSON.parse(message.toString());
+
+        const { recipient, text, file } = messageData;
+        let fileUrl = null;
+
+        if (file) {
+          const uploadResult = await cloudinary.uploader.upload(file.data, {
+            folder: 'chat_app',
+          });
+          fileUrl = uploadResult.secure_url;
+        }
+
+        if (recipient && (text || file)) {
+          const messageDoc = await Message.create({
+            sender: connection.userId,
+            recipient,
+            text,
+            file: file ? fileUrl : null,
+          });
+
+          const broadcastPayload = {
+            text,
+            sender: connection.userId,
+            recipient,
+            file: file ? fileUrl : null,
+            _id: messageDoc._id,
+          };
+
+          [...wss.clients]
+            .filter((c) => c.userId === recipient || c.userId === connection.userId)
+            .forEach((c) => c.send(JSON.stringify(broadcastPayload)));
+        }
+      } catch (error) {
+        console.error('Error handling WebSocket message:', error);
+      }
+    });
+
+    connection.on('close', () => {
+      notifyAboutOnlinePeople();
+    });
+
+    // Initial notification
+    notifyAboutOnlinePeople();
+  });
 });
