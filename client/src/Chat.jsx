@@ -7,7 +7,8 @@ import axios from "axios";
 import Contact from "./Contact";
 import aiLogo from "./assets/generative.png";
 
-axios.defaults.baseURL = "http://localhost:4040";
+// Updated to use production backend URL
+axios.defaults.baseURL = "https://nexchat223.onrender.com";
 axios.defaults.withCredentials = true;
 
 export default function Chat() {
@@ -59,7 +60,8 @@ export default function Chat() {
     let ws;
 
     function connectToWs() {
-      ws = new WebSocket("ws://localhost:4040");
+      // Updated WebSocket URL to use secure WebSocket (wss) for production
+      ws = new WebSocket("wss://nexchat223.onrender.com");
 
       ws.addEventListener("open", () => {
         console.log("WebSocket connected");
