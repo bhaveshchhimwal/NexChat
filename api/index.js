@@ -13,18 +13,17 @@ const path = require('path');
 
 dotenv.config();
 
-// Add debugging logs
+// Debug logs
 console.log('🚀 Starting server...');
 console.log('📊 Environment:', process.env.NODE_ENV);
 console.log('🔗 MongoDB URL exists:', !!process.env.MONGO_URL);
 console.log('🔐 JWT Secret exists:', !!process.env.JWT_SECRET);
 
-// Add global error handlers
+// Global error handlers
 process.on('uncaughtException', (error) => {
   console.error('❌ Uncaught Exception:', error);
   process.exit(1);
 });
-
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
@@ -40,22 +39,13 @@ cloudinary.config({
 // ---------------- Mongo ----------------
 console.log('📦 Connecting to MongoDB...');
 mongoose.connect(process.env.MONGO_URL)
-  .then(() => {
-    console.log('✅ MongoDB connected successfully');
-  })
+  .then(() => console.log('✅ MongoDB connected successfully'))
   .catch((error) => {
     console.error('❌ MongoDB connection failed:', error);
     process.exit(1);
   });
-
-// Handle mongoose connection events
-mongoose.connection.on('error', (error) => {
-  console.error('❌ MongoDB connection error:', error);
-});
-
-mongoose.connection.on('disconnected', () => {
-  console.log('⚠️ MongoDB disconnected');
-});
+mongoose.connection.on('error', (error) => console.error('❌ MongoDB connection error:', error));
+mongoose.connection.on('disconnected', () => console.log('⚠️ MongoDB disconnected'));
 
 const jwtSecret = process.env.JWT_SECRET;
 const bcryptSalt = bcrypt.genSaltSync(10);
@@ -66,10 +56,13 @@ app.use(cookieParser());
 
 const isDev = process.env.NODE_ENV !== 'production';
 
+// ---------------- CORS ----------------
 app.use(
   cors({
     credentials: true,
-    origin: process.env.CLIENT_URL,
+    origin: isDev
+      ? 'http://localhost:5173' // dev frontend
+      : 'https://nexchat44.onrender.com', // deployed frontend
   })
 );
 
@@ -119,9 +112,7 @@ app.post('/api/ai', async (req, res) => {
       return res.json({ reply: data.candidates[0].content.parts[0].text });
     }
 
-    return res
-      .status(500)
-      .json({ error: 'Invalid response from Gemini API', details: data });
+    return res.status(500).json({ error: 'Invalid response from Gemini API', details: data });
   } catch (error) {
     console.error('Error in /api/ai:', error);
     res.status(500).json({ error: 'Error getting response from AI.' });
@@ -141,13 +132,11 @@ app.post('/login', async (req, res) => {
     jwt.sign({ userId: foundUser._id, username }, jwtSecret, {}, (err, token) => {
       if (err) return res.status(500).json({ message: 'JWT Error' });
 
-      res
-        .cookie('token', token, {
-          sameSite: isDev ? 'lax' : 'none',
-          secure: !isDev,
-          httpOnly: true,
-        })
-        .json({ id: foundUser._id, username: foundUser.username });
+      res.cookie('token', token, {
+        sameSite: isDev ? 'lax' : 'none',
+        secure: !isDev,
+        httpOnly: true,
+      }).json({ id: foundUser._id, username: foundUser.username });
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -167,14 +156,11 @@ app.post('/register', async (req, res) => {
     jwt.sign({ userId: createdUser._id, username }, jwtSecret, {}, (err, token) => {
       if (err) return res.status(500).json({ message: 'JWT Error' });
 
-      res
-        .cookie('token', token, {
-          sameSite: isDev ? 'lax' : 'none',
-          secure: !isDev,
-          httpOnly: true,
-        })
-        .status(201)
-        .json({ id: createdUser._id, username: createdUser.username });
+      res.cookie('token', token, {
+        sameSite: isDev ? 'lax' : 'none',
+        secure: !isDev,
+        httpOnly: true,
+      }).status(201).json({ id: createdUser._id, username: createdUser.username });
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -227,32 +213,22 @@ app.get('/profile', async (req, res) => {
 // ---------------- Serve React Build ----------------
 if (!isDev) {
   const clientBuildPath = path.join(__dirname, '../client/build');
-  
-  // Check if client build directory exists
   const fs = require('fs');
+
   if (fs.existsSync(clientBuildPath)) {
     console.log('📁 Serving static files from:', clientBuildPath);
     app.use(express.static(clientBuildPath));
-    
-    // Handle React Router routes - serve index.html for non-API routes
+
     app.get(/^(?!\/api).*/, (req, res) => {
       res.sendFile(path.join(clientBuildPath, 'index.html'));
     });
   } else {
     console.log('⚠️ Client build directory not found. Running API only.');
-    
-    // Serve a simple message for non-API routes
     app.get(/^(?!\/api).*/, (req, res) => {
-      res.json({ 
+      res.json({
         message: 'NexChat API is running',
         status: 'API only mode - frontend not built',
-        endpoints: {
-          test: '/test',
-          login: '/login',
-          register: '/register',
-          profile: '/profile',
-          people: '/people'
-        }
+        endpoints: { test: '/test', login: '/login', register: '/register', profile: '/profile', people: '/people' }
       });
     });
   }
@@ -262,9 +238,7 @@ if (!isDev) {
 const PORT = process.env.PORT || 4040;
 console.log(`🚀 Starting server on port ${PORT}...`);
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server is running on port ${PORT}`);
-});
+const server = app.listen(PORT, '0.0.0.0', () => console.log(`✅ Server is running on port ${PORT}`));
 
 const wss = new ws.WebSocketServer({ server });
 console.log('🔌 WebSocket server initialized');
@@ -273,21 +247,16 @@ wss.on('connection', (connection, req) => {
   console.log('👤 New WebSocket connection');
 
   function notifyAboutOnlinePeople() {
-    [...wss.clients].forEach((client) => {
-      client.send(
-        JSON.stringify({
-          online: [...wss.clients].map((c) => ({
-            userId: c.userId,
-            username: c.username,
-          })),
-        })
-      );
+    [...wss.clients].forEach(client => {
+      client.send(JSON.stringify({
+        online: [...wss.clients].map(c => ({ userId: c.userId, username: c.username }))
+      }));
     });
   }
 
   const cookies = req.headers.cookie;
   if (cookies) {
-    const tokenCookieString = cookies.split(';').find((str) => str.startsWith('token='));
+    const tokenCookieString = cookies.split(';').find(str => str.startsWith('token='));
     if (tokenCookieString) {
       const token = tokenCookieString.split('=')[1];
       if (token) {
@@ -302,39 +271,24 @@ wss.on('connection', (connection, req) => {
     }
   }
 
-  connection.on('message', async (message) => {
+  connection.on('message', async message => {
     try {
       const messageData = JSON.parse(message.toString());
-
       const { recipient, text, file } = messageData;
       let fileUrl = null;
 
       if (file) {
-        const uploadResult = await cloudinary.uploader.upload(file.data, {
-          folder: 'chat_app',
-        });
+        const uploadResult = await cloudinary.uploader.upload(file.data, { folder: 'chat_app' });
         fileUrl = uploadResult.secure_url;
       }
 
       if (recipient && (text || file)) {
-        const messageDoc = await Message.create({
-          sender: connection.userId,
-          recipient,
-          text,
-          file: file ? fileUrl : null,
-        });
-
-        const broadcastPayload = {
-          text,
-          sender: connection.userId,
-          recipient,
-          file: file ? fileUrl : null,
-          _id: messageDoc._id,
-        };
+        const messageDoc = await Message.create({ sender: connection.userId, recipient, text, file: file ? fileUrl : null });
+        const broadcastPayload = { text, sender: connection.userId, recipient, file: file ? fileUrl : null, _id: messageDoc._id };
 
         [...wss.clients]
-          .filter((c) => c.userId === recipient || c.userId === connection.userId)
-          .forEach((c) => c.send(JSON.stringify(broadcastPayload)));
+          .filter(c => c.userId === recipient || c.userId === connection.userId)
+          .forEach(c => c.send(JSON.stringify(broadcastPayload)));
       }
     } catch (error) {
       console.error('❌ Error handling WebSocket message:', error);

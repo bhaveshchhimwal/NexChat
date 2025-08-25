@@ -3,7 +3,11 @@ import { UserContextProvider } from "./UserContext";
 import Routes from "./Routes";
 
 function App() {
-  axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4040';
+  // Set Axios base URL depending on environment
+  axios.defaults.baseURL = import.meta.env.VITE_API_URL 
+    || (import.meta.env.MODE === 'development' 
+        ? 'http://localhost:4040' 
+        : 'https://nexchat223.onrender.com');
   axios.defaults.withCredentials = true;
 
   return (
@@ -12,7 +16,7 @@ function App() {
         <Routes />
       </div>
     </UserContextProvider>
-  )
+  );
 }
 
 export default App;
