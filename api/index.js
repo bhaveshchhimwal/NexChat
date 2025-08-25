@@ -248,15 +248,19 @@ wss.on('connection', (connection, req) => {
 
   function notifyAboutOnlinePeople() {
     [...wss.clients].forEach(client => {
-      client.send(JSON.stringify({
-        online: [...wss.clients].map(c => ({ userId: c.userId, username: c.username }))
-      }));
+      if (client.readyState === ws.OPEN) {
+        client.send(JSON.stringify({
+          online: [...wss.clients]
+            .filter(c => c.userId && c.username)
+            .map(c => ({ userId: c.userId, username: c.username }))
+        }));
+      }
     });
   }
 
   const cookies = req.headers.cookie;
   if (cookies) {
-    const tokenCookieString = cookies.split(';').find(str => str.startsWith('token='));
+    const tokenCookieString = cookies.split(';').find(str => str.trim().startsWith('token='));
     if (tokenCookieString) {
       const token = tokenCookieString.split('=')[1];
       if (token) {
@@ -287,7 +291,7 @@ wss.on('connection', (connection, req) => {
         const broadcastPayload = { text, sender: connection.userId, recipient, file: file ? fileUrl : null, _id: messageDoc._id };
 
         [...wss.clients]
-          .filter(c => c.userId === recipient || c.userId === connection.userId)
+          .filter(c => c.readyState === ws.OPEN && (c.userId === recipient || c.userId === connection.userId))
           .forEach(c => c.send(JSON.stringify(broadcastPayload)));
       }
     } catch (error) {
