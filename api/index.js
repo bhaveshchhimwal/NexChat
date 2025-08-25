@@ -205,12 +205,47 @@ app.get('/profile', async (req, res) => {
 
 // ---------------- Production: Serve React ----------------
 if (!isDev) {
-  const clientPath = path.resolve(__dirname, '../client/dist'); // ✅ FIX: safer path
-  app.use(express.static(clientPath));
+  // ✅ FIX: Multiple potential paths for different deployment scenarios
+  const possiblePaths = [
+    path.join(__dirname, 'client', 'dist'),      // server and client in same root
+    path.join(__dirname, '..', 'client', 'dist'), // server in subfolder
+    path.join(__dirname, 'dist'),                 // dist in same folder as server
+    path.join(__dirname, '..', 'dist'),           // dist in parent folder
+    path.join(process.cwd(), 'client', 'dist'),   // using process working directory
+    path.join(process.cwd(), 'dist')              // dist in working directory
+  ];
 
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(clientPath, 'index.html'));
-  });
+  let clientPath = null;
+  const fs = require('fs');
+  
+  // Find the correct path
+  for (const testPath of possiblePaths) {
+    if (fs.existsSync(path.join(testPath, 'index.html'))) {
+      clientPath = testPath;
+      console.log(`✅ Found client build at: ${clientPath}`);
+      break;
+    }
+  }
+
+  if (clientPath) {
+    app.use(express.static(clientPath));
+    
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(clientPath, 'index.html'));
+    });
+  } else {
+    console.error('❌ Could not find client build directory with index.html');
+    console.log('Searched paths:');
+    possiblePaths.forEach(p => console.log(`  - ${p}`));
+    
+    // Fallback route for debugging
+    app.get('*', (req, res) => {
+      res.status(404).json({ 
+        error: 'Client build not found',
+        searchedPaths: possiblePaths 
+      });
+    });
+  }
 }
 
 // ---------------- WebSocket ----------------
