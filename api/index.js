@@ -241,19 +241,34 @@ console.log(`🚀 Starting server on port ${PORT}...`);
 const server = app.listen(PORT, '0.0.0.0', () => console.log(`✅ Server is running on port ${PORT}`));
 
 const wss = new ws.WebSocketServer({ server });
-console.log('🔌 WebSocket server initialized');
-
 wss.on('connection', (connection, req) => {
-  console.log('👤 New WebSocket connection');
 
   function notifyAboutOnlinePeople() {
     [...wss.clients].forEach(client => {
       client.send(JSON.stringify({
-        online: [...wss.clients].map(c => ({ userId: c.userId, username: c.username }))
+        online: [...wss.clients].map(c => ({ userId: c.userId, username: c.username })),
       }));
     });
   }
 
+  connection.isAlive = true;
+
+  connection.timer = setInterval(() => {
+    connection.ping();
+    connection.deathTimer = setTimeout(() => {
+      connection.isAlive = false;
+      clearInterval(connection.timer);
+      connection.terminate();
+      notifyAboutOnlinePeople();
+      console.log('dead');
+    }, 1000);
+  }, 5000);
+
+  connection.on('pong', () => {
+    clearTimeout(connection.deathTimer);
+  });
+
+  // read username and id form the cookie for this connection
   const cookies = req.headers.cookie;
   if (cookies) {
     const tokenCookieString = cookies.split(';').find(str => str.startsWith('token='));
@@ -261,16 +276,14 @@ wss.on('connection', (connection, req) => {
       const token = tokenCookieString.split('=')[1];
       if (token) {
         jwt.verify(token, jwtSecret, {}, (err, userData) => {
-          if (!err) {
-            connection.userId = userData.userId;
-            connection.username = userData.username;
-            console.log(`✅ WebSocket authenticated: ${userData.username}`);
-          }
+          if (err) throw err;
+          const { userId, username } = userData;
+          connection.userId = userId;
+          connection.username = username;
         });
       }
     }
   }
-
   connection.on('message', async message => {
     try {
       const messageData = JSON.parse(message.toString());
