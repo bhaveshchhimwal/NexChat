@@ -51,25 +51,44 @@ const jwtSecret = process.env.JWT_SECRET;
 const bcryptSalt = bcrypt.genSaltSync(10);
 
 const app = express();
-app.use(express.json());
+
+// FIX 1: Increase payload limit for mobile file uploads
+app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
 const isDev = process.env.NODE_ENV !== 'production';
 
-// ---------------- CORS ----------------
+// FIX 2: Enhanced CORS for mobile compatibility
 app.use(
   cors({
     credentials: true,
-    origin: isDev
-      ? 'http://localhost:5173' // dev frontend
-      : 'https://nexchat44.onrender.com', // deployed frontend
+    origin: function(origin, callback) {
+      const allowedOrigins = [
+        'http://localhost:5173', // dev frontend
+        'https://nexchat44.onrender.com', // deployed frontend
+        'http://localhost:3000', // alternative dev port
+        'capacitor://localhost', // Capacitor mobile apps
+        'ionic://localhost' // Ionic mobile apps
+      ];
+      
+      // Allow requests with no origin (mobile apps)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.includes(origin) || isDev) {
+        callback(null, true);
+      } else {
+        // Allow all in production for mobile compatibility
+        callback(null, true);
+      }
+    }
   })
 );
 
-// ---------------- Helper ----------------
+// FIX 3: Enhanced helper function for mobile token support
 async function getUserDataFromRequest(req) {
   return new Promise((resolve, reject) => {
-    const token = req.cookies?.token;
+    // Try cookie first, then Authorization header for mobile
+    const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
     if (!token) return reject('no token');
     jwt.verify(token, jwtSecret, {}, (err, userData) => {
       if (err) return reject(err);
@@ -136,7 +155,11 @@ app.post('/login', async (req, res) => {
         sameSite: isDev ? 'lax' : 'none',
         secure: !isDev,
         httpOnly: true,
-      }).json({ id: foundUser._id, username: foundUser.username });
+      }).json({ 
+        id: foundUser._id, 
+        username: foundUser.username,
+        token: token // FIX 4: Send token in response for mobile apps
+      });
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -160,7 +183,11 @@ app.post('/register', async (req, res) => {
         sameSite: isDev ? 'lax' : 'none',
         secure: !isDev,
         httpOnly: true,
-      }).status(201).json({ id: createdUser._id, username: createdUser.username });
+      }).status(201).json({ 
+        id: createdUser._id, 
+        username: createdUser.username,
+        token: token // FIX 4: Send token in response for mobile apps
+      });
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -173,6 +200,7 @@ app.post('/logout', (req, res) => {
 });
 
 // ---------------- Messages ----------------
+// FIX 5: Fixed message query for proper conversation loading
 app.get('/messages/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -180,8 +208,10 @@ app.get('/messages/:userId', async (req, res) => {
     const ourUserId = userData.userId;
 
     const messages = await Message.find({
-      sender: { $in: [userId, ourUserId] },
-      recipient: { $in: [userId, ourUserId] },
+      $or: [
+        { sender: userId, recipient: ourUserId },
+        { sender: ourUserId, recipient: userId }
+      ]
     }).sort({ createdAt: 1 });
 
     res.json(messages);
@@ -234,7 +264,7 @@ if (!isDev) {
   }
 }
 
-// ---------------- WebSocket ----------------
+// ---------------- Enhanced WebSocket for Concurrent Chats ----------------
 const PORT = process.env.PORT || 4040;
 console.log(`🚀 Starting server on port ${PORT}...`);
 
@@ -243,40 +273,100 @@ const server = app.listen(PORT, '0.0.0.0', () => console.log(`✅ Server is runn
 const wss = new ws.WebSocketServer({ server });
 console.log('🔌 WebSocket server initialized');
 
+// FIX 6: Enhanced connection tracking for concurrent chats
+const userConnections = new Map(); // userId -> Set of connections
+
 wss.on('connection', (connection, req) => {
   console.log('👤 New WebSocket connection');
+  connection.isAuthenticated = false;
 
   function notifyAboutOnlinePeople() {
-    [...wss.clients].forEach(client => {
-      if (client.readyState === ws.OPEN) {
-        client.send(JSON.stringify({
-          online: [...wss.clients]
-            .filter(c => c.userId && c.username)
-            .map(c => ({ userId: c.userId, username: c.username }))
-        }));
+    const onlineUsers = [];
+    userConnections.forEach((connections, userId) => {
+      // Check if user has any active connections
+      const hasActiveConnection = Array.from(connections).some(conn => 
+        conn.readyState === ws.OPEN && conn.isAuthenticated
+      );
+      
+      if (hasActiveConnection) {
+        const activeConn = Array.from(connections).find(conn => 
+          conn.readyState === ws.OPEN && conn.isAuthenticated
+        );
+        if (activeConn && activeConn.username) {
+          onlineUsers.push({ userId, username: activeConn.username });
+        }
       }
+    });
+
+    // Remove duplicates
+    const uniqueUsers = onlineUsers.filter((user, index, self) => 
+      index === self.findIndex(u => u.userId === user.userId)
+    );
+
+    // Send to all authenticated connections
+    userConnections.forEach((connections) => {
+      connections.forEach(conn => {
+        if (conn.readyState === ws.OPEN && conn.isAuthenticated) {
+          try {
+            conn.send(JSON.stringify({ online: uniqueUsers }));
+          } catch (error) {
+            console.error('Error sending online users:', error);
+          }
+        }
+      });
     });
   }
 
+  // FIX 7: Enhanced authentication with mobile token support
   const cookies = req.headers.cookie;
+  let token = null;
+
+  // Try cookies first
   if (cookies) {
     const tokenCookieString = cookies.split(';').find(str => str.trim().startsWith('token='));
     if (tokenCookieString) {
-      const token = tokenCookieString.split('=')[1];
-      if (token) {
-        jwt.verify(token, jwtSecret, {}, (err, userData) => {
-          if (!err) {
-            connection.userId = userData.userId;
-            connection.username = userData.username;
-            console.log(`✅ WebSocket authenticated: ${userData.username}`);
-          }
-        });
-      }
+      token = tokenCookieString.split('=')[1];
     }
+  }
+
+  // Try URL parameter for mobile WebSocket connections
+  if (!token) {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    token = url.searchParams.get('token');
+  }
+
+  if (token) {
+    jwt.verify(token, jwtSecret, {}, (err, userData) => {
+      if (!err && userData) {
+        connection.userId = userData.userId;
+        connection.username = userData.username;
+        connection.isAuthenticated = true;
+
+        // FIX 8: Track user connections properly
+        if (!userConnections.has(userData.userId)) {
+          userConnections.set(userData.userId, new Set());
+        }
+        userConnections.get(userData.userId).add(connection);
+
+        console.log(`✅ WebSocket authenticated: ${userData.username}`);
+        setTimeout(() => notifyAboutOnlinePeople(), 100);
+      } else {
+        console.log('❌ WebSocket authentication failed:', err);
+        connection.close(1000, 'Authentication failed');
+      }
+    });
+  } else {
+    console.log('❌ No authentication token');
+    connection.close(1000, 'No authentication token');
   }
 
   connection.on('message', async message => {
     try {
+      if (!connection.isAuthenticated) {
+        console.log('❌ Unauthenticated message attempt');
+        return;
+      }
+
       const messageData = JSON.parse(message.toString());
       const { recipient, text, file } = messageData;
       let fileUrl = null;
@@ -287,12 +377,39 @@ wss.on('connection', (connection, req) => {
       }
 
       if (recipient && (text || file)) {
-        const messageDoc = await Message.create({ sender: connection.userId, recipient, text, file: file ? fileUrl : null });
-        const broadcastPayload = { text, sender: connection.userId, recipient, file: file ? fileUrl : null, _id: messageDoc._id };
+        const messageDoc = await Message.create({ 
+          sender: connection.userId, 
+          recipient, 
+          text, 
+          file: file ? fileUrl : null 
+        });
 
-        [...wss.clients]
-          .filter(c => c.readyState === ws.OPEN && (c.userId === recipient || c.userId === connection.userId))
-          .forEach(c => c.send(JSON.stringify(broadcastPayload)));
+        const broadcastPayload = { 
+          text, 
+          sender: connection.userId, 
+          recipient, 
+          file: file ? fileUrl : null, 
+          _id: messageDoc._id,
+          createdAt: messageDoc.createdAt
+        };
+
+        // FIX 9: Improved message broadcasting for concurrent chats
+        const targetUserIds = [connection.userId, recipient];
+        
+        targetUserIds.forEach(userId => {
+          const userConns = userConnections.get(userId);
+          if (userConns) {
+            userConns.forEach(conn => {
+              if (conn.readyState === ws.OPEN && conn.isAuthenticated) {
+                try {
+                  conn.send(JSON.stringify(broadcastPayload));
+                } catch (error) {
+                  console.error('Error sending message:', error);
+                }
+              }
+            });
+          }
+        });
       }
     } catch (error) {
       console.error('❌ Error handling WebSocket message:', error);
@@ -301,10 +418,46 @@ wss.on('connection', (connection, req) => {
 
   connection.on('close', () => {
     console.log('👋 WebSocket connection closed');
-    notifyAboutOnlinePeople();
+    
+    // FIX 10: Proper connection cleanup
+    if (connection.userId && userConnections.has(connection.userId)) {
+      userConnections.get(connection.userId).delete(connection);
+      if (userConnections.get(connection.userId).size === 0) {
+        userConnections.delete(connection.userId);
+      }
+    }
+    
+    setTimeout(() => notifyAboutOnlinePeople(), 100);
   });
 
-  notifyAboutOnlinePeople();
+  connection.on('error', (error) => {
+    console.error('❌ WebSocket error:', error);
+    // Cleanup on error
+    if (connection.userId && userConnections.has(connection.userId)) {
+      userConnections.get(connection.userId).delete(connection);
+      if (userConnections.get(connection.userId).size === 0) {
+        userConnections.delete(connection.userId);
+      }
+    }
+  });
 });
+
+// FIX 11: Connection health monitoring
+setInterval(() => {
+  userConnections.forEach((connections, userId) => {
+    const activeConnections = new Set();
+    connections.forEach(conn => {
+      if (conn.readyState === ws.OPEN) {
+        activeConnections.add(conn);
+      }
+    });
+    
+    if (activeConnections.size === 0) {
+      userConnections.delete(userId);
+    } else {
+      userConnections.set(userId, activeConnections);
+    }
+  });
+}, 30000);
 
 console.log('🎉 Server setup complete!');

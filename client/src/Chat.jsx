@@ -39,21 +39,24 @@ export default function Chat() {
     if ("online" in messageData) {
       showOnlinePeople(messageData.online);
     } else if ("text" in messageData || "file" in messageData) {
-      setMessages((prev) => {
-        let filtered = prev.filter(
-          (m) =>
-            !(
-              m.sender === messageData.sender &&
-              m.recipient === messageData.recipient &&
-              m.text === messageData.text &&
-              m.file === messageData.file &&
-              m._id.startsWith("temp")
-            )
-        );
-        return uniqBy([...filtered, messageData], "_id");
-      });
+      // Only update messages if it's relevant to current user
+      if (messageData.sender === id || messageData.recipient === id) {
+        setMessages((prev) => {
+          let filtered = prev.filter(
+            (m) =>
+              !(
+                m.sender === messageData.sender &&
+                m.recipient === messageData.recipient &&
+                m.text === messageData.text &&
+                m.file === messageData.file &&
+                m._id.startsWith("temp")
+              )
+          );
+          return uniqBy([...filtered, messageData], "_id");
+        });
+      }
     }
-  }, []);
+  }, [id]);
 
   // ---------------- WebSocket connection ----------------
   useEffect(() => {
@@ -211,12 +214,7 @@ export default function Chat() {
         <span className="font-medium text-gray-800">
           {selectedUserId ? (onlinePeople[selectedUserId] || offlinePeople[selectedUserId]?.username) : 'Chat'}
         </span>
-        <button
-          onClick={logout}
-          className="text-sm bg-blue-100 py-1 px-2 text-gray-500 border rounded-sm"
-        >
-          logout
-        </button>
+        <div></div>
       </div>
 
       {/* Sidebar Overlay for Mobile */}
@@ -274,16 +272,19 @@ export default function Chat() {
           ))}
         </div>
         
-        <div className="hidden md:flex p-2 text-center items-center justify-center">
+        {/* Profile and Logout Section - Now visible on both mobile and desktop */}
+        <div className="flex p-2 text-center items-center justify-center border-t">
           <span className="mr-2 text-sm text-gray-600 flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
               <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
             </svg>
-            {username}
+            <span className="ml-1">{username}</span>
           </span>
           <button
             onClick={logout}
-            className="text-sm bg-blue-100 py-1 px-2 text-gray-500 border rounded-sm">logout</button>
+            className="text-sm bg-blue-100 py-1 px-2 text-gray-500 border rounded-sm hover:bg-blue-200 transition-colors">
+            logout
+          </button>
         </div>
       </div>
 
@@ -463,4 +464,4 @@ export default function Chat() {
       </div>
     </div>
   );
-} 
+}
