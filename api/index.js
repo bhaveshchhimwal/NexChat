@@ -264,7 +264,7 @@ if (!isDev) {
   }
 }
 
-// ---------------- Enhanced WebSocket for Concurrent Chats ----------------
+// ---------------- FIXED WebSocket for Multiple Concurrent Chats ----------------
 const PORT = process.env.PORT || 4040;
 console.log(`🚀 Starting server on port ${PORT}...`);
 
@@ -273,8 +273,8 @@ const server = app.listen(PORT, '0.0.0.0', () => console.log(`✅ Server is runn
 const wss = new ws.WebSocketServer({ server });
 console.log('🔌 WebSocket server initialized');
 
-// FIX 6: Enhanced connection tracking for concurrent chats
-const userConnections = new Map(); // userId -> Set of connections
+// FIX: Simple connection tracking - one connection per user
+const userConnections = new Map(); // userId -> connection object
 
 wss.on('connection', (connection, req) => {
   console.log('👤 New WebSocket connection');
@@ -282,42 +282,29 @@ wss.on('connection', (connection, req) => {
 
   function notifyAboutOnlinePeople() {
     const onlineUsers = [];
-    userConnections.forEach((connections, userId) => {
-      // Check if user has any active connections
-      const hasActiveConnection = Array.from(connections).some(conn => 
-        conn.readyState === ws.OPEN && conn.isAuthenticated
-      );
-      
-      if (hasActiveConnection) {
-        const activeConn = Array.from(connections).find(conn => 
-          conn.readyState === ws.OPEN && conn.isAuthenticated
-        );
-        if (activeConn && activeConn.username) {
-          onlineUsers.push({ userId, username: activeConn.username });
-        }
+    
+    // Get all authenticated users
+    userConnections.forEach((conn, userId) => {
+      if (conn.readyState === ws.OPEN && conn.isAuthenticated && conn.username) {
+        onlineUsers.push({ userId, username: conn.username });
       }
     });
 
-    // Remove duplicates
-    const uniqueUsers = onlineUsers.filter((user, index, self) => 
-      index === self.findIndex(u => u.userId === user.userId)
-    );
+    console.log('📡 Broadcasting online users:', onlineUsers.length);
 
     // Send to all authenticated connections
-    userConnections.forEach((connections) => {
-      connections.forEach(conn => {
-        if (conn.readyState === ws.OPEN && conn.isAuthenticated) {
-          try {
-            conn.send(JSON.stringify({ online: uniqueUsers }));
-          } catch (error) {
-            console.error('Error sending online users:', error);
-          }
+    userConnections.forEach((conn) => {
+      if (conn.readyState === ws.OPEN && conn.isAuthenticated) {
+        try {
+          conn.send(JSON.stringify({ online: onlineUsers }));
+        } catch (error) {
+          console.error('Error sending online users:', error);
         }
-      });
+      }
     });
   }
 
-  // FIX 7: Enhanced authentication with mobile token support
+  // Authentication logic
   const cookies = req.headers.cookie;
   let token = null;
 
@@ -342,13 +329,17 @@ wss.on('connection', (connection, req) => {
         connection.username = userData.username;
         connection.isAuthenticated = true;
 
-        // FIX 8: Track user connections properly
-        if (!userConnections.has(userData.userId)) {
-          userConnections.set(userData.userId, new Set());
+        // FIX: Replace existing connection for this user
+        if (userConnections.has(userData.userId)) {
+          const oldConn = userConnections.get(userData.userId);
+          if (oldConn.readyState === ws.OPEN) {
+            oldConn.close(1000, 'New connection established');
+          }
         }
-        userConnections.get(userData.userId).add(connection);
-
+        
+        userConnections.set(userData.userId, connection);
         console.log(`✅ WebSocket authenticated: ${userData.username}`);
+        
         setTimeout(() => notifyAboutOnlinePeople(), 100);
       } else {
         console.log('❌ WebSocket authentication failed:', err);
@@ -393,23 +384,29 @@ wss.on('connection', (connection, req) => {
           createdAt: messageDoc.createdAt
         };
 
-        // FIX 9: Improved message broadcasting for concurrent chats
-        const targetUserIds = [connection.userId, recipient];
-        
-        targetUserIds.forEach(userId => {
-          const userConns = userConnections.get(userId);
-          if (userConns) {
-            userConns.forEach(conn => {
-              if (conn.readyState === ws.OPEN && conn.isAuthenticated) {
-                try {
-                  conn.send(JSON.stringify(broadcastPayload));
-                } catch (error) {
-                  console.error('Error sending message:', error);
-                }
-              }
-            });
+        // FIX: Send message only to sender and recipient
+        const senderConn = userConnections.get(connection.userId);
+        const recipientConn = userConnections.get(recipient);
+
+        // Send to sender
+        if (senderConn && senderConn.readyState === ws.OPEN && senderConn.isAuthenticated) {
+          try {
+            senderConn.send(JSON.stringify(broadcastPayload));
+          } catch (error) {
+            console.error('Error sending message to sender:', error);
           }
-        });
+        }
+
+        // Send to recipient
+        if (recipientConn && recipientConn.readyState === ws.OPEN && recipientConn.isAuthenticated) {
+          try {
+            recipientConn.send(JSON.stringify(broadcastPayload));
+          } catch (error) {
+            console.error('Error sending message to recipient:', error);
+          }
+        }
+
+        console.log(`📨 Message sent from ${connection.username} to recipient ${recipient}`);
       }
     } catch (error) {
       console.error('❌ Error handling WebSocket message:', error);
@@ -417,47 +414,41 @@ wss.on('connection', (connection, req) => {
   });
 
   connection.on('close', () => {
-    console.log('👋 WebSocket connection closed');
+    console.log(`👋 WebSocket connection closed for user: ${connection.username || 'unknown'}`);
     
-    // FIX 10: Proper connection cleanup
-    if (connection.userId && userConnections.has(connection.userId)) {
-      userConnections.get(connection.userId).delete(connection);
-      if (userConnections.get(connection.userId).size === 0) {
-        userConnections.delete(connection.userId);
-      }
+    // FIX: Remove user from online list
+    if (connection.userId && userConnections.get(connection.userId) === connection) {
+      userConnections.delete(connection.userId);
+      setTimeout(() => notifyAboutOnlinePeople(), 100);
     }
-    
-    setTimeout(() => notifyAboutOnlinePeople(), 100);
   });
 
   connection.on('error', (error) => {
     console.error('❌ WebSocket error:', error);
     // Cleanup on error
-    if (connection.userId && userConnections.has(connection.userId)) {
-      userConnections.get(connection.userId).delete(connection);
-      if (userConnections.get(connection.userId).size === 0) {
-        userConnections.delete(connection.userId);
-      }
+    if (connection.userId && userConnections.get(connection.userId) === connection) {
+      userConnections.delete(connection.userId);
     }
   });
 });
 
-// FIX 11: Connection health monitoring
+// FIX: Simple cleanup of dead connections
 setInterval(() => {
-  userConnections.forEach((connections, userId) => {
-    const activeConnections = new Set();
-    connections.forEach(conn => {
-      if (conn.readyState === ws.OPEN) {
-        activeConnections.add(conn);
-      }
-    });
-    
-    if (activeConnections.size === 0) {
-      userConnections.delete(userId);
-    } else {
-      userConnections.set(userId, activeConnections);
+  const deadConnections = [];
+  
+  userConnections.forEach((conn, userId) => {
+    if (conn.readyState !== ws.OPEN) {
+      deadConnections.push(userId);
     }
   });
+  
+  deadConnections.forEach(userId => {
+    userConnections.delete(userId);
+  });
+  
+  if (deadConnections.length > 0) {
+    console.log(`🧹 Cleaned up ${deadConnections.length} dead connections`);
+  }
 }, 30000);
 
 console.log('🎉 Server setup complete!');
