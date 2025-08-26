@@ -94,11 +94,12 @@ export default function Chat() {
       setId(null);
       setUsername(null);
     });
-  }
-
-  function sendMessage(ev, file = null) {
+  } function sendMessage(ev, file = null) {
     if (ev) ev.preventDefault();
     if (!ws) return;
+
+    // Prevent sending empty text and no file
+    if (!newMessageText.trim() && !file) return;
 
     const tempId = "temp" + Date.now().toString() + Math.random().toString().slice(2, 11);
     const newSentMessage = {
@@ -121,6 +122,7 @@ export default function Chat() {
 
     setNewMessageText("");
   }
+
 
   function sendFile(ev) {
     const reader = new FileReader();
@@ -164,7 +166,7 @@ export default function Chat() {
 
   const messagesWithoutDupes = uniqBy(messages, "_id").filter(message => {
     return (message.sender === selectedUserId && message.recipient === id) ||
-           (message.sender === id && message.recipient === selectedUserId);
+      (message.sender === id && message.recipient === selectedUserId);
   });
 
   // -------------- AI Assistant ----------------
@@ -219,7 +221,7 @@ export default function Chat() {
 
       {/* Sidebar Overlay for Mobile */}
       {showSidebar && (
-        <div 
+        <div
           className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
           onClick={() => setShowSidebar(false)}
         />
@@ -228,11 +230,11 @@ export default function Chat() {
       {/* Sidebar */}
       <div className={`bg-white flex flex-col transition-transform duration-300 ease-in-out z-50
         md:relative md:w-1/3 md:translate-x-0
-        ${showSidebar 
-          ? 'fixed inset-y-0 left-0 w-80 translate-x-0' 
+        ${showSidebar
+          ? 'fixed inset-y-0 left-0 w-80 translate-x-0'
           : 'fixed inset-y-0 left-0 w-80 -translate-x-full md:translate-x-0'
         }`}>
-        
+
         {/* Mobile sidebar header */}
         <div className="md:hidden flex items-center justify-between p-4 border-b">
           <div className="flex items-center">
@@ -271,7 +273,7 @@ export default function Chat() {
             />
           ))}
         </div>
-        
+
         {/* Profile and Logout Section - Now visible on both mobile and desktop */}
         <div className="flex p-2 text-center items-center justify-center border-t">
           <span className="mr-2 text-sm text-gray-600 flex items-center">
@@ -325,7 +327,7 @@ export default function Chat() {
                           {message.text}
                         </div>
                       )}
-                      
+
                       {message.file && (
                         <div>
                           {(message.file.endsWith(".png") ||
@@ -420,7 +422,7 @@ export default function Chat() {
                     ×
                   </button>
                 </div>
-                
+
                 <div className="flex-grow flex flex-col overflow-hidden">
                   <div className="flex-grow overflow-y-auto p-3 bg-gray-50">
                     {aiLoading ? (
@@ -437,7 +439,7 @@ export default function Chat() {
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="p-3 border-t bg-white">
                     <textarea
                       className="w-full border rounded-md p-2 text-sm focus:outline-none focus:border-blue-500 resize-none"
