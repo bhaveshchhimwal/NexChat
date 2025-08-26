@@ -94,20 +94,26 @@ export default function Chat() {
       setId(null);
       setUsername(null);
     });
-  } function sendMessage(ev, file = null) {
+  }
+
+  function sendMessage(ev, file = null) {
     if (ev) ev.preventDefault();
     if (!ws) return;
 
-    // Prevent sending empty text and no file
-    if (!newMessageText.trim() && !file) return;
+    // Enhanced validation to prevent empty messages
+    const hasText = newMessageText && newMessageText.trim().length > 0;
+    const hasFile = file && file.name;
+    
+    // Prevent sending if neither text nor file is present
+    if (!hasText && !hasFile) return;
 
     const tempId = "temp" + Date.now().toString() + Math.random().toString().slice(2, 11);
     const newSentMessage = {
       _id: tempId,
       sender: id,
       recipient: selectedUserId,
-      text: newMessageText,
-      file: file ? file.name : null,
+      text: hasText ? newMessageText.trim() : "", // Trim whitespace
+      file: hasFile ? file.name : null,
       deleted: false,
     };
     setMessages((prev) => [...prev, newSentMessage]);
@@ -115,14 +121,13 @@ export default function Chat() {
     ws.send(
       JSON.stringify({
         recipient: selectedUserId,
-        text: newMessageText,
+        text: hasText ? newMessageText.trim() : "", // Trim whitespace
         file,
       })
     );
 
     setNewMessageText("");
   }
-
 
   function sendFile(ev) {
     const reader = new FileReader();
