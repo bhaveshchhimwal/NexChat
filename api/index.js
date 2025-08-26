@@ -233,7 +233,6 @@ if (!isDev) {
     });
   }
 }
-
 // ---------------- WebSocket ----------------
 const PORT = process.env.PORT || 4040;
 console.log(`🚀 Starting server on port ${PORT}...`);
@@ -241,18 +240,24 @@ console.log(`🚀 Starting server on port ${PORT}...`);
 const server = app.listen(PORT, '0.0.0.0', () => console.log(`✅ Server is running on port ${PORT}`));
 
 const wss = new ws.WebSocketServer({ server });
+
+// Utility to broadcast online users
+function notifyAboutOnlinePeople() {
+  const online = [...wss.clients]
+    .filter(c => c.userId) // only authenticated users
+    .map(c => ({ userId: c.userId, username: c.username }));
+
+  [...wss.clients].forEach(client => {
+    if (client.readyState === ws.OPEN) {
+      client.send(JSON.stringify({ online }));
+    }
+  });
+}
+
 wss.on('connection', (connection, req) => {
-
-  function notifyAboutOnlinePeople() {
-    [...wss.clients].forEach(client => {
-      client.send(JSON.stringify({
-        online: [...wss.clients].map(c => ({ userId: c.userId, username: c.username })),
-      }));
-    });
-  }
-
   connection.isAlive = true;
 
+  // Heartbeat
   connection.timer = setInterval(() => {
     connection.ping();
     connection.deathTimer = setTimeout(() => {
@@ -268,7 +273,7 @@ wss.on('connection', (connection, req) => {
     clearTimeout(connection.deathTimer);
   });
 
-  // read username and id form the cookie for this connection
+  // Authenticate user from cookie
   const cookies = req.headers.cookie;
   if (cookies) {
     const tokenCookieString = cookies.split(';').find(str => str.startsWith('token='));
@@ -277,17 +282,21 @@ wss.on('connection', (connection, req) => {
       if (token) {
         jwt.verify(token, jwtSecret, {}, (err, userData) => {
           if (err) throw err;
-          const { userId, username } = userData;
-          connection.userId = userId;
-          connection.username = username;
+
+          connection.userId = userData.userId;
+          connection.username = userData.username;
+
+          // ✅ Only now broadcast online users
+          notifyAboutOnlinePeople();
         });
       }
     }
   }
+
+  // Handle incoming messages
   connection.on('message', async message => {
     try {
-      const messageData = JSON.parse(message.toString());
-      const { recipient, text, file } = messageData;
+      const { recipient, text, file } = JSON.parse(message.toString());
       let fileUrl = null;
 
       if (file) {
@@ -296,24 +305,35 @@ wss.on('connection', (connection, req) => {
       }
 
       if (recipient && (text || file)) {
-        const messageDoc = await Message.create({ sender: connection.userId, recipient, text, file: file ? fileUrl : null });
-        const broadcastPayload = { text, sender: connection.userId, recipient, file: file ? fileUrl : null, _id: messageDoc._id };
+        const messageDoc = await Message.create({
+          sender: connection.userId,
+          recipient,
+          text,
+          file: file ? fileUrl : null
+        });
+
+        const broadcastPayload = {
+          text,
+          sender: connection.userId,
+          recipient,
+          file: file ? fileUrl : null,
+          _id: messageDoc._id
+        };
 
         [...wss.clients]
           .filter(c => c.userId === recipient || c.userId === connection.userId)
-          .forEach(c => c.send(JSON.stringify(broadcastPayload)));
+          .forEach(c => {
+            if (c.readyState === ws.OPEN) c.send(JSON.stringify(broadcastPayload));
+          });
       }
     } catch (error) {
       console.error('❌ Error handling WebSocket message:', error);
     }
   });
 
+  // Handle disconnect
   connection.on('close', () => {
     console.log('👋 WebSocket connection closed');
     notifyAboutOnlinePeople();
   });
-
-  notifyAboutOnlinePeople();
 });
-
-console.log('🎉 Server setup complete!');
