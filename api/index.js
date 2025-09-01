@@ -14,18 +14,18 @@ const path = require('path');
 dotenv.config();
 
 // Debug logs
-console.log('🚀 Starting server...');
-console.log('📊 Environment:', process.env.NODE_ENV);
-console.log('🔗 MongoDB URL exists:', !!process.env.MONGO_URL);
-console.log('🔐 JWT Secret exists:', !!process.env.JWT_SECRET);
+console.log('Starting server...');
+console.log('Environment:', process.env.NODE_ENV);
+console.log('MongoDB URL exists:', !!process.env.MONGO_URL);
+console.log('JWT Secret exists:', !!process.env.JWT_SECRET);
 
 // Global error handlers
 process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
+  console.error('Uncaught Exception:', error);
   process.exit(1);
 });
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
 });
 
@@ -37,15 +37,15 @@ cloudinary.config({
 });
 
 // ---------------- Mongo ----------------
-console.log('📦 Connecting to MongoDB...');
+console.log('Connecting to MongoDB...');
 mongoose.connect(process.env.MONGO_URL)
-  .then(() => console.log('✅ MongoDB connected successfully'))
+  .then(() => console.log('MongoDB connected successfully'))
   .catch((error) => {
-    console.error('❌ MongoDB connection failed:', error);
+    console.error('MongoDB connection failed:', error);
     process.exit(1);
   });
-mongoose.connection.on('error', (error) => console.error('❌ MongoDB connection error:', error));
-mongoose.connection.on('disconnected', () => console.log('⚠️ MongoDB disconnected'));
+mongoose.connection.on('error', (error) => console.error('MongoDB connection error:', error));
+mongoose.connection.on('disconnected', () => console.log('MongoDB disconnected'));
 
 const jwtSecret = process.env.JWT_SECRET;
 const bcryptSalt = bcrypt.genSaltSync(10);
@@ -80,7 +80,7 @@ async function getUserDataFromRequest(req) {
 
 // ---------------- Routes ----------------
 app.get('/test', (req, res) => {
-  console.log('🧪 Test route hit');
+  console.log('Test route hit');
   res.json('ok');
 });
 
@@ -216,14 +216,14 @@ if (!isDev) {
   const fs = require('fs');
 
   if (fs.existsSync(clientBuildPath)) {
-    console.log('📁 Serving static files from:', clientBuildPath);
+    console.log('Serving static files from:', clientBuildPath);
     app.use(express.static(clientBuildPath));
 
     app.get(/^(?!\/api).*/, (req, res) => {
       res.sendFile(path.join(clientBuildPath, 'index.html'));
     });
   } else {
-    console.log('⚠️ Client build directory not found. Running API only.');
+    console.log('Client build directory not found. Running API only.');
     app.get(/^(?!\/api).*/, (req, res) => {
       res.json({
         message: 'NexChat API is running',
@@ -235,9 +235,9 @@ if (!isDev) {
 }
 // ---------------- WebSocket ----------------
 const PORT = process.env.PORT || 4040;
-console.log(`🚀 Starting server on port ${PORT}...`);
+console.log(`Starting server on port ${PORT}...`);
 
-const server = app.listen(PORT, '0.0.0.0', () => console.log(`✅ Server is running on port ${PORT}`));
+const server = app.listen(PORT, '0.0.0.0', () => console.log(`Server is running on port ${PORT}`));
 
 const wss = new ws.WebSocketServer({ server });
 
@@ -286,7 +286,7 @@ wss.on('connection', (connection, req) => {
           connection.userId = userData.userId;
           connection.username = userData.username;
 
-          // ✅ Only now broadcast online users
+          // Only now broadcast online users
           notifyAboutOnlinePeople();
         });
       }
@@ -327,13 +327,13 @@ wss.on('connection', (connection, req) => {
           });
       }
     } catch (error) {
-      console.error('❌ Error handling WebSocket message:', error);
+      console.error('Error handling WebSocket message:', error);
     }
   });
 
   // Handle disconnect
   connection.on('close', () => {
-    console.log('👋 WebSocket connection closed');
+    console.log('WebSocket connection closed');
     notifyAboutOnlinePeople();
   });
 });
