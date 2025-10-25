@@ -6,8 +6,8 @@ import cors from "cors";
 import cloudinary from "cloudinary";
 import path from "path";
 import fs from "fs";
-import { fileURLToPath } from "url";     
-import { initSocketIO } from "./websockets/socketio.js"; 
+import { fileURLToPath } from "url";
+import { initSocketIO } from "./websockets/socketio.js";
 import userRoutes from "./routes/user.js";
 import aiRoutes from './routes/ai.js';
 import messageRoutes from "./routes/message.js";
@@ -33,16 +33,26 @@ app.use(express.json());
 app.use(cookieParser());
 
 // CORS setup
-const isDev = process.env.NODE_ENV !== 'production';
+
+const allowedOrigins = [
+  'http://localhost:5173',
+  process.env.CLIENT_URL, // ✅ will be your Render frontend URL
+];
+
 app.use(
   cors({
     credentials: true,
-    origin: isDev 
-      ? process.env.CLIENT_URL || 'http://localhost:5173'
-      : process.env.CLIENT_URL, 
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('CORS not allowed'));
+      }
+    },
   })
 );
 
+const isDev = process.env.NODE_ENV !== 'production';
 app.use("/user", userRoutes);
 app.use("/ai", aiRoutes);
 app.use("/message", messageRoutes);
