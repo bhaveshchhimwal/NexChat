@@ -9,16 +9,15 @@ export function UserContextProvider({ children }) {
 
   useEffect(() => {
     const baseUrl =
-      import.meta.env.VITE_BACKEND_URL ||
-      (import.meta.env.MODE === "development"
-        ? "http://localhost:4040"
-        : "https://nexchat223.onrender.com");
+      import.meta.env.VITE_BACKEND_URL || "http://localhost:4040";
 
     axios
       .get(`${baseUrl}/user/profile`, { withCredentials: true })
       .then((response) => {
-        setId(response.data.userId);
-        setUsername(response.data.username);
+        // backend returns { userId, username } from profile
+        const userData = response.data;
+        setId(userData.userId || userData.id);
+        setUsername(userData.username);
       })
       .catch((err) => {
         console.error("Failed to fetch user profile:", err);
