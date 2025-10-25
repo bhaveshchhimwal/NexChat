@@ -13,28 +13,33 @@ import aiRoutes from './routes/ai.js';
 import messageRoutes from "./routes/message.js";
 
 dotenv.config();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Configure Cloudinary
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
+
+// Connect to MongoDB
 mongoose.connect(process.env.MONGO_URL);
 
+// Initialize Express
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
+// CORS setup
 const isDev = process.env.NODE_ENV !== 'production';
-
 app.use(
   cors({
     credentials: true,
-    origin: isDev
-      ? 'http://localhost:5173'
-      : 'https://nexchat44.onrender.com',
+    origin: isDev 
+      ? process.env.CLIENT_URL || 'http://localhost:5173'
+      : process.env.CLIENT_URL, 
   })
 );
 
@@ -43,7 +48,7 @@ app.use("/ai", aiRoutes);
 app.use("/message", messageRoutes);
 
 if (!isDev) {
-  const clientBuildPath = path.join(__dirname, '../client/build');
+  const clientBuildPath = path.join(__dirname, '../client/dist');
 
   if (fs.existsSync(clientBuildPath)) {
     console.log('📁 Serving static files from:', clientBuildPath);
@@ -68,5 +73,5 @@ const server = app.listen(PORT, '0.0.0.0', () =>
   console.log(`Server running on port ${PORT}`)
 );
 
-// Initialize Socket.IO server
+// Initialize Socket.IO
 initSocketIO(server);
