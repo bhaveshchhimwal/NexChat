@@ -8,23 +8,22 @@ dotenv.config();
 const jwtSecret = process.env.JWT_SECRET;
 
 export function initSocketIO(server) {
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://nexchat223.onrender.com"
-];
+  const allowedOrigins = [
+    "https://nexchat44.onrender.com"
+  ];
 
-const io = new Server(server, {
-  cors: {
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
+  const io = new Server(server, {
+    cors: {
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error("Not allowed by CORS"));
+        }
+      },
+      credentials: true,
     },
-    credentials: true,
-  },
-});
+  });
 
   // Helper to broadcast online users
   function notifyAboutOnlinePeople() {
@@ -98,7 +97,7 @@ const io = new Server(server, {
 
     // Handle disconnect
     socket.on("disconnect", () => {
-    //  console.log("User disconnected:", socket.username);
+      //  console.log("User disconnected:", socket.username);
       notifyAboutOnlinePeople();
     });
   });
