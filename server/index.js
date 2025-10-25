@@ -13,7 +13,6 @@ import aiRoutes from './routes/ai.js';
 import messageRoutes from "./routes/message.js";
 
 dotenv.config();
-s
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

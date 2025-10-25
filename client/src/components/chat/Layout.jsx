@@ -14,8 +14,9 @@ import { createLogout } from "../functions/logout.js";
 import { createShowOnlinePeople } from "../functions/onlineFunctions.js";
 import { createSelectUser } from "../functions/sidebarFunctions.js";
 import { createSocketIO } from "../functions/useSocketIO.js"; 
-
-axios.defaults.baseURL = "http://localhost:4040";
+import dotenv from "dotenv";
+dotenv.config();
+axios.defaults.baseURL = process.env.VITE_BACKEND_URL || "http://localhost:4040";
 axios.defaults.withCredentials = true;
 
 export default function Layout() {
