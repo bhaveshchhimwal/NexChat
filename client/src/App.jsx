@@ -9,6 +9,7 @@ function App() {
   // Configure Axios
   axios.defaults.baseURL = backendUrl;
   axios.defaults.withCredentials = true;
+console.log(import.meta.env.VITE_BACKEND_URL);
 
   return (
     <UserContextProvider>

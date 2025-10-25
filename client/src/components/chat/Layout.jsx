@@ -15,7 +15,7 @@ import { createShowOnlinePeople } from "../functions/onlineFunctions.js";
 import { createSelectUser } from "../functions/sidebarFunctions.js";
 import { createSocketIO } from "../functions/useSocketIO.js"; 
 
-axios.defaults.baseURL = process.env.VITE_BACKEND_URL || "http://localhost:4040";
+axios.defaults.baseURL = import.meta.env.VITE_BACKEND_URL  || "http://localhost:4040";
 axios.defaults.withCredentials = true;
 
 export default function Layout() {
