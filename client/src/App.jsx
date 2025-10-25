@@ -4,10 +4,12 @@ import Routes from "./routes/Routes.jsx";
 
 function App() {
 
-  axios.defaults.baseURL = import.meta.env.VITE_API_URL 
+  const backendUrl = import.meta.env.VITE_BACKEND_URL 
     || (import.meta.env.MODE === 'development' 
         ? 'http://localhost:4040' 
         : 'https://nexchat223.onrender.com');
+
+  axios.defaults.baseURL = backendUrl;
   axios.defaults.withCredentials = true;
 
   return (
