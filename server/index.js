@@ -6,18 +6,22 @@ import cors from "cors";
 import cloudinary from "cloudinary";
 import path from "path";
 import fs from "fs";
-import { initSocketIO } from "./websockets/socketio.js"; // Socket.IO
+import { fileURLToPath } from "url";     
+import { initSocketIO } from "./websockets/socketio.js"; 
 import userRoutes from "./routes/user.js";
 import aiRoutes from './routes/ai.js';
 import messageRoutes from "./routes/message.js";
+
 dotenv.config();
+s
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
-
 mongoose.connect(process.env.MONGO_URL);
 
 const app = express();

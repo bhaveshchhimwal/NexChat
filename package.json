@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "build": "cd client && npm install && npm run build",
-    "start": "cd api && npm start",
-    "dev": "concurrently \"cd api && npm run dev\" \"cd client && npm start\""
+    "start": "cd server && npm start",
+    "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm start\""
   },
   "dependencies": {
     "@babel/runtime": "^7.28.3",
