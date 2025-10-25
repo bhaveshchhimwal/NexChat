@@ -4,12 +4,11 @@ import Routes from "./routes/Routes.jsx";
 
 function App() {
   // Base URL: use environment variable
-  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+  const backendUrl = "https://nexchat223.onrender.com";
 
   // Configure Axios
   axios.defaults.baseURL = backendUrl;
   axios.defaults.withCredentials = true;
-console.log(import.meta.env.VITE_BACKEND_URL);
 
   return (
     <UserContextProvider>
