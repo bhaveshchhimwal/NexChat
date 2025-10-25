@@ -3,7 +3,7 @@ export function createLogout({ socket, setSocket, setId, setUsername }) {
     if (!socket) return;
 
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4040';
+      const backendUrl = import.meta.env.VITE_BACKEND_URL;
       await fetch(`${backendUrl}/user/logout`, {
         method: 'POST',
         credentials: 'include',

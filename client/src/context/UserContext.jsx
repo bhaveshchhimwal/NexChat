@@ -9,7 +9,7 @@ export function UserContextProvider({ children }) {
 
   useEffect(() => {
     const baseUrl =
-      import.meta.env.VITE_BACKEND_URL || "http://localhost:4040";
+      import.meta.env.VITE_BACKEND_URL;
 
     axios
       .get(`${baseUrl}/user/profile`, { withCredentials: true })

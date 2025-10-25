@@ -5,7 +5,7 @@ export function createSocketIO({ id, setMessages, showOnlinePeople, setSocket })
   let socket;
 
   function connect() {
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:4040";
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
     socket = io(backendUrl, {
       withCredentials: true, // sends cookies for JWT

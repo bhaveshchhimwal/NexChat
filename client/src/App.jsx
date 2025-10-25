@@ -4,7 +4,7 @@ import Routes from "./routes/Routes.jsx";
 
 function App() {
   // Base URL: use environment variable
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4040';
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
   // Configure Axios
   axios.defaults.baseURL = backendUrl;
@@ -18,6 +18,6 @@ console.log(import.meta.env.VITE_BACKEND_URL);
       </div>
     </UserContextProvider>
   );
-}
+} 
 
 export default App;
