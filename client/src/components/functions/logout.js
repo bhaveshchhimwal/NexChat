@@ -1,5 +1,4 @@
- import dotenv from "dotenv";
- dotenv.config();
+
 export function createLogout({ socket, setSocket, setId, setUsername }) {
   return async function logout() {
     if (!socket) return;
