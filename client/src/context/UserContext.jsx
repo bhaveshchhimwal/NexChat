@@ -8,8 +8,7 @@ export function UserContextProvider({ children }) {
   const [id, setId] = useState(null);
 
   useEffect(() => {
-    const baseUrl =
-      import.meta.env.VITE_BACKEND_URL;
+    const baseUrl = "https://nexchat223.onrender.com";
 
     axios
       .get(`${baseUrl}/user/profile`, { withCredentials: true })

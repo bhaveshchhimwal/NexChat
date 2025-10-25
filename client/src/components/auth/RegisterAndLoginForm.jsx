@@ -19,10 +19,9 @@ async function handleSubmit(ev) {
     return;
   }
 
-const baseUrl = import.meta.env.VITE_BACKEND_URL;
+const baseUrl = "https://nexchat223.onrender.com";
 const endpoint = isLoginOrRegister === "register" ? "register" : "login";
 const url = `${baseUrl}/user/${endpoint}`;
-console.log(import.meta.env.VITE_BACKEND_URL);
 
 
   try {

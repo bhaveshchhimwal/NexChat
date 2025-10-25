@@ -5,7 +5,7 @@ export function createSocketIO({ id, setMessages, showOnlinePeople, setSocket })
   let socket;
 
   function connect() {
-    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+    const backendUrl = "https://nexchat223.onrender.com";
 
     socket = io(backendUrl, {
       withCredentials: true, // sends cookies for JWT
