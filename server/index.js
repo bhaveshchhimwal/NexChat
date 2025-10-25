@@ -35,8 +35,8 @@ app.use(cookieParser());
 // CORS setup
 
 const allowedOrigins = [
-  'http://localhost:5173',
-  process.env.CLIENT_URL, // ✅ will be your Render frontend URL
+  "http://localhost:5173",
+  "https://nexchat44.onrender.com"// ✅ will be your Render frontend URL
 ];
 
 app.use(

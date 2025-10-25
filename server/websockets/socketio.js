@@ -8,12 +8,20 @@ dotenv.config();
 const jwtSecret = process.env.JWT_SECRET;
 
 export function initSocketIO(server) {
- const io = new Server(server, {
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://nexchat223.onrender.com"
+];
+
+const io = new Server(server, {
   cors: {
-    origin:
-      process.env.NODE_ENV !== "production"
-        ? "http://localhost:5173"  // <-- frontend dev URL
-        : "https://nexchat44.onrender.com", // <-- production URL
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   },
 });
