@@ -55,11 +55,15 @@ export const login = async (req, res) => {
         jwt.sign({ userId: foundUser._id, username }, jwtSecret, {}, (err, token) => {
             if (err) return res.status(500).json({ message: 'JWT Error' });
 
+
             res.cookie('token', token, {
-                sameSite: isDev ? 'lax' : 'none',
-                secure: !isDev,
                 httpOnly: true,
-            }).json({ id: foundUser._id, username: foundUser.username });
+                sameSite: 'None', // cross-origin
+                secure: true,     // HTTPS required
+                path: '/',
+            });
+
+            res.json({ id: foundUser._id, username: foundUser.username });
         });
     } catch (error) {
         console.error('Login error:', error);
