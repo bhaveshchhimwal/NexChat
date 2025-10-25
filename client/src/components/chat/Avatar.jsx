@@ -5,8 +5,8 @@ export default function Avatar({ userId, username, online }) {
     "bg-fuchsia-200", "bg-rose-200"
   ];
 
-  // Fallbacks
-  const safeUserId = userId || "000000000000000000000000"; // dummy ObjectId
+  
+  const safeUserId = userId || "000000000000000000000000"; 
   const userIdBase10 = parseInt(safeUserId.substring(10), 16) || 0;
   const colorIndex = userIdBase10 % colors.length;
   const color = colors[colorIndex];

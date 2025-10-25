@@ -1,9 +1,9 @@
 import axios from "axios";
-import { UserContextProvider } from "./UserContext";
-import Routes from "./Routes";
+import { UserContextProvider } from "./context/UserContext.jsx";
+import Routes from "./routes/Routes.jsx";
 
 function App() {
-  // Set Axios base URL depending on environment
+
   axios.defaults.baseURL = import.meta.env.VITE_API_URL 
     || (import.meta.env.MODE === 'development' 
         ? 'http://localhost:4040' 

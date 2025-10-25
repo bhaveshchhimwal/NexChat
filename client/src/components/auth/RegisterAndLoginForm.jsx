@@ -1,37 +1,54 @@
 import { useContext, useState } from "react";
 import axios from "axios";
-import { UserContext } from "./UserContext.jsx";
-import Logo from "./Logo.jsx";
+import { UserContext } from "../../context/UserContext.jsx";
+import Logo from "../logo/Logo.jsx";
 
 export default function RegisterAndLoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoginOrRegister, setIsLoginOrRegister] = useState("login");
-  const [error, setError] = useState(""); // <-- new state for errors
+  const [error, setError] = useState("");
   const { setUsername: setLoggedInUsername, setId } = useContext(UserContext);
+async function handleSubmit(ev) {
+  ev.preventDefault();
+  setError("");
 
-  async function handleSubmit(ev) {
-    ev.preventDefault();
-    setError(""); // clear error before new request
-    const url = isLoginOrRegister === "register" ? "register" : "login";
+  if (isLoginOrRegister === "register" && password !== confirmPassword) {
+    setError("Passwords do not match");
+    return;
+  }
 
-    try {
-      const { data } = await axios.post(url, { username, password });
-      setLoggedInUsername(username);
-      setId(data.id);
-    } catch (err) {
-      if (err.response && err.response.data && err.response.data.message) {
-        setError(err.response.data.message);
-      } else {
-        setError("Something went wrong. Please try again.");
-      }
+const baseUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:4040";
+const endpoint = isLoginOrRegister === "register" ? "register" : "login";
+const url = `${baseUrl}/user/${endpoint}`;
+
+
+  try {
+    const payload = isLoginOrRegister === "register"
+      ? { username, password, confirmPassword }
+      : { username, password };
+
+    const { data } = await axios.post(url, payload, { withCredentials: true });
+
+    setLoggedInUsername(username);
+    setId(data.id);
+
+
+    if (isLoginOrRegister === "register") setConfirmPassword("");
+  } catch (err) {
+    if (err.response && err.response.data && err.response.data.message) {
+      setError(err.response.data.message);
+    } else {
+      setError("Something went wrong. Please try again.");
     }
   }
+}
+
 
   return (
     <div className="h-screen flex flex-col items-center justify-center bg-gradient-to-br from-purple-100 to-blue-100">
       <div className="bg-white p-8 rounded-2xl shadow-md w-80 text-center">
-        {/* Logo + Title */}
         <div className="mb-6">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Logo className="w-8 h-8 text-purple-600" />
@@ -43,7 +60,6 @@ export default function RegisterAndLoginForm() {
           </p>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-3">
           <input
             value={username}
@@ -60,7 +76,17 @@ export default function RegisterAndLoginForm() {
             className="block w-full rounded-lg p-2 border border-gray-300 focus:ring-2 focus:ring-purple-400 outline-none"
           />
 
-          {/* Error Message */}
+          {isLoginOrRegister === "register" && (
+            <input
+              value={confirmPassword}
+              onChange={(ev) => setConfirmPassword(ev.target.value)}
+              type="password"
+              placeholder="Confirm Password"
+              className="block w-full rounded-lg p-2 border border-gray-300 focus:ring-2 focus:ring-purple-400 outline-none"
+            />
+          )}
+
+
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
           <button className="w-full py-2 rounded-lg text-white font-medium bg-gradient-to-r from-purple-500 to-blue-500 hover:opacity-90 transition">
@@ -68,7 +94,6 @@ export default function RegisterAndLoginForm() {
           </button>
         </form>
 
-        {/* Switch */}
         <div className="mt-4 text-sm text-gray-600">
           {isLoginOrRegister === "register" ? (
             <p>
@@ -96,7 +121,6 @@ export default function RegisterAndLoginForm() {
         </div>
       </div>
 
-      {/* Footer */}
       <footer className="mt-7 text-xm text-gray-500">
         Designed & Developed by Bhavesh Chhimwal
       </footer>

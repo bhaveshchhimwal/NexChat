@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const MessageSchema = new mongoose.Schema({
   sender: {type: mongoose.Schema.Types.ObjectId, ref: 'User'},
@@ -9,4 +9,4 @@ const MessageSchema = new mongoose.Schema({
 
 const MessageModel = mongoose.model('Message', MessageSchema);
 
-module.exports = MessageModel;
+export default MessageModel;
