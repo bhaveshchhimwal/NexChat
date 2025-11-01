@@ -19,7 +19,6 @@ export  function Sidebar({
         : 'fixed inset-y-0 left-0 w-80 -translate-x-full md:translate-x-0'
       }`}>
 
-      {/* Mobile sidebar header */}
       <div className="md:hidden flex items-center justify-between p-4 border-b">
         <div className="flex items-center">
           <Logo />
@@ -58,7 +57,7 @@ export  function Sidebar({
         ))}
       </div>
 
-      {/* Profile and Logout Section */}
+
       <div className="flex p-2 text-center items-center justify-center border-t">
         <span className="mr-2 text-sm text-gray-600 flex items-center">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">

@@ -8,9 +8,7 @@ dotenv.config();
 const jwtSecret = process.env.JWT_SECRET;
 
 export function initSocketIO(server) {
-  const allowedOrigins = [
-    "https://nexchat44.onrender.com"
-  ];
+  const allowedOrigins = ["https://nexchat44.onrender.com"];
 
   const io = new Server(server, {
     cors: {
@@ -25,7 +23,6 @@ export function initSocketIO(server) {
     },
   });
 
-  // Helper to broadcast online users
   function notifyAboutOnlinePeople() {
     const online = Array.from(io.sockets.sockets.values())
       .filter((s) => s.userId)
@@ -33,7 +30,7 @@ export function initSocketIO(server) {
     io.emit("online-users", online);
   }
 
-  // Middleware: verify JWT from cookie
+
   io.use((socket, next) => {
     const token = socket.handshake.headers.cookie
       ?.split(";")
@@ -50,16 +47,15 @@ export function initSocketIO(server) {
     });
   });
 
+  
   io.on("connection", (socket) => {
-    //console.log("User connected:", socket.username);
-
-    // Notify all clients about online users
     notifyAboutOnlinePeople();
 
-    // Handle sending messages
+
     socket.on("send-message", async ({ recipient, text, file }) => {
       try {
         let fileUrl = null;
+
         if (file) {
           const uploadResult = await cloudinary.uploader.upload(file.data, {
             folder: "chat_app",
@@ -73,17 +69,22 @@ export function initSocketIO(server) {
             recipient,
             text,
             file: file ? fileUrl : null,
+            isDeleted: false,
+            isEdited: false,
           });
 
           const payload = {
             _id: messageDoc._id,
             sender: socket.userId,
             recipient,
-            text,
+            text: messageDoc.text,
             file: fileUrl,
+            createdAt: messageDoc.createdAt,
+            updatedAt: messageDoc.updatedAt,
+            isDeleted: false,
+            isEdited: false,
           };
 
-          // Send message to both sender and recipient if online
           for (const s of io.sockets.sockets.values()) {
             if (s.userId === recipient || s.userId === socket.userId) {
               s.emit("receive-message", payload);
@@ -95,9 +96,83 @@ export function initSocketIO(server) {
       }
     });
 
-    // Handle disconnect
+    socket.on("update-message", async ({ messageId, newText }) => {
+      try {
+        const message = await Message.findById(messageId);
+        if (!message) return;
+
+        if (message.sender.toString() !== socket.userId) return;
+
+        
+        const createdAtMs = message.createdAt
+          ? new Date(message.createdAt).getTime()
+          : new Date(message._id.getTimestamp()).getTime();
+
+        const messageAge = Date.now() - createdAtMs;
+        const timeLimit = 5 * 60 * 1000; // 5 mins
+
+        if (messageAge > timeLimit) return;
+
+        message.text = newText;
+        message.isEdited = true;
+        await message.save();
+
+        const payload = {
+          _id: message._id,
+          text: message.text,
+          isEdited: true,
+          updatedAt: message.updatedAt,
+        };
+
+        for (const s of io.sockets.sockets.values()) {
+          if (
+            s.userId === message.recipient.toString() ||
+            s.userId === message.sender.toString()
+          ) {
+            s.emit("message-updated", payload);
+          }
+        }
+      } catch (err) {
+        console.error("Error updating message:", err);
+      }
+    });
+    socket.on("delete-message", async ({ messageId }) => {
+      try {
+        const message = await Message.findById(messageId);
+        if (!message) return;
+
+        if (message.sender.toString() !== socket.userId) return;
+
+        const createdAtMs = message.createdAt
+          ? new Date(message.createdAt).getTime()
+          : new Date(message._id.getTimestamp()).getTime();
+
+        const messageAge = Date.now() - createdAtMs;
+        const timeLimit = 5 * 60 * 1000; // 5 mins
+
+        if (messageAge > timeLimit) return;
+
+        message.text = "";
+        message.file = null;
+        message.isDeleted = true;
+        await message.save();
+
+        const payload = { _id: message._id, isDeleted: true };
+
+        for (const s of io.sockets.sockets.values()) {
+          if (
+            s.userId === message.recipient.toString() ||
+            s.userId === message.sender.toString()
+          ) {
+            s.emit("message-deleted", payload);
+          }
+        }
+      } catch (err) {
+        console.error("Error deleting message:", err);
+      }
+    });
+
     socket.on("disconnect", () => {
-      //  console.log("User disconnected:", socket.username);
       notifyAboutOnlinePeople();
     });
   });

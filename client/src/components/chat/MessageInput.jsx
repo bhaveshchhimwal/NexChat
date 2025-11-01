@@ -16,16 +16,24 @@ export function MessageInput({
   askAI,
   handleAiKeyDown,
 }) {
+  
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage(e);
+    }
+  };
+
   return (
     <form className="flex gap-2 relative" onSubmit={sendMessage}>
-      <input
-        type="text"
+      <textarea
         value={newMessageText}
         onChange={(ev) => setNewMessageText(ev.target.value)}
-        placeholder="Type your message here"
-        className="bg-white flex-grow border rounded-sm p-2 text-sm md:text-base"
+        placeholder="Type your message here..."
+        className="bg-white flex-grow border rounded-sm p-2 text-sm md:text-base resize-none"
+        rows={1}
+        onKeyDown={handleKeyDown}
       />
-
       <button
         type="button"
         onClick={() => setShowAIAssistant((prev) => !prev)}
@@ -46,7 +54,7 @@ export function MessageInput({
       >
         <span className="text-sm md:text-base">➤</span>
       </button>
-
+      
       {showAIAssistant && (
         <div
           className={`absolute bottom-12 z-50 bg-white shadow-lg rounded-md border flex flex-col

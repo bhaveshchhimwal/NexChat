@@ -13,7 +13,6 @@ export function UserContextProvider({ children }) {
     axios
       .get(`${baseUrl}/user/profile`, { withCredentials: true })
       .then((response) => {
-        // backend returns { userId, username } from profile
         const userData = response.data;
         setId(userData.userId || userData.id);
         setUsername(userData.username);

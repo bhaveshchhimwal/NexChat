@@ -34,11 +34,11 @@ export default function Layout() {
   const [showSidebar, setShowSidebar] = useState(false);
   const divUnderMessages = useRef();
 
-  // Factory functions
+
   const showOnlinePeople = createShowOnlinePeople(setOnlinePeople);
   const handleSelectUser = createSelectUser(setSelectedUserId, setShowSidebar);
 
-  // Initialize Socket.IO
+ 
   useEffect(() => {
     const socketInstance = createSocketIO({
       id,
@@ -53,7 +53,7 @@ export default function Layout() {
   }, [id]);
 
   const sendMessage = createSendMessage({
-    socket, // updated from ws
+    socket, 
     selectedUserId,
     messages,
     setMessages,
@@ -67,13 +67,12 @@ export default function Layout() {
   const handleAiKeyDown = createHandleAiKeyDown(askAI);
   const logoutFn = createLogout({ socket, setSocket, setId, setUsername });
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     const div = divUnderMessages.current;
     if (div) div.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
 
-  // Fetch offline people
+  
   useEffect(() => {
     axios.get("/user/people").then((res) => {
       const offlinePeopleArr = res.data
@@ -87,7 +86,7 @@ export default function Layout() {
     });
   }, [onlinePeople, id]);
 
-  // Fetch messages with selected user
+
   useEffect(() => {
     if (selectedUserId) {
       axios.get("/message/" + selectedUserId).then((res) => {
@@ -107,7 +106,7 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen relative">
-      {/* Mobile Header */}
+      
       <MobileHeader
         selectedUserId={selectedUserId}
         onlinePeople={onlinePeople}
@@ -115,7 +114,7 @@ export default function Layout() {
         setShowSidebar={setShowSidebar}
       />
 
-      {/* Sidebar */}
+  
       <Sidebar
         showSidebar={showSidebar}
         setShowSidebar={setShowSidebar}
@@ -127,13 +126,14 @@ export default function Layout() {
         logout={logoutFn}
       />
 
-      {/* Chat Section (fixed layout) */}
+     
       <div className="flex flex-col bg-blue-50 w-full md:w-2/3 p-2 md:p-2 relative pt-16 md:pt-2">
         <ChatWindow
           messages={messages}
           messagesWithoutDupes={messagesWithoutDupes}
           id={id}
           divUnderMessages={divUnderMessages}
+           socket={socket}
         />
 
         {!!selectedUserId && (

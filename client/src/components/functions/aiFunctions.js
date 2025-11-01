@@ -18,7 +18,6 @@ export function createAskAI({ aiQuestion, setAiResponse, setAiQuestion, setAiLoa
   };
 }
 
-// KeyDown handler factory
 export function createHandleAiKeyDown(askAIFn) {
   return function handleAiKeyDown(e) {
     if (e.key === "Enter" && !e.shiftKey) {

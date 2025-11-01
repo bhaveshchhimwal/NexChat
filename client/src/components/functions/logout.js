@@ -3,16 +3,14 @@ export function createLogout({ socket, setSocket, setId, setUsername }) {
     try {
       const backendUrl = "https://nexchat223.onrender.com";
 
-      // Call backend logout to clear cookie
+     
       await fetch(`${backendUrl}/user/logout`, {
         method: 'POST',
-        credentials: 'include', // important to send JWT cookie
+        credentials: 'include', 
       });
 
-      // Disconnect socket if exists
       if (socket) socket.disconnect();
 
-      // Reset frontend state
       setSocket(null);
       setId(null);
       setUsername(null);

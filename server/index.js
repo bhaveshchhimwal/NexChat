@@ -17,14 +17,12 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Configure Cloudinary
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Connect to MongoDB
 mongoose.connect(process.env.MONGO_URL);
 
 // Initialize Express
@@ -35,7 +33,7 @@ app.use(cookieParser());
 // CORS setup
 
 const allowedOrigins = [
-  "https://nexchat44.onrender.com"// ✅ will be your Render frontend URL
+  "https://nexchat44.onrender.com"
 ];
 
 app.use(
@@ -82,5 +80,4 @@ const server = app.listen(PORT, '0.0.0.0', () =>
   console.log(`Server running on port ${PORT}`)
 );
 
-// Initialize Socket.IO
 initSocketIO(server);

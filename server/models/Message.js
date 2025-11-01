@@ -1,12 +1,15 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-const MessageSchema = new mongoose.Schema({
-  sender: {type: mongoose.Schema.Types.ObjectId, ref: 'User'},
-  recipient: {type: mongoose.Schema.Types.ObjectId, ref: 'User'},
-  text: String,
-  file: String,
-}, {timestamps:true});
+const MessageSchema = new mongoose.Schema(
+  {
+    sender: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    recipient: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    text: String,
+    file: String,
+    isDeleted: { type: Boolean, default: false },
+    isEdited: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
 
-const MessageModel = mongoose.model('Message', MessageSchema);
-
-export default MessageModel;
+export default mongoose.model("Message", MessageSchema);
