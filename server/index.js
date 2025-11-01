@@ -25,12 +25,12 @@ cloudinary.v2.config({
 
 mongoose.connect(process.env.MONGO_URL);
 
-// Initialize Express
+
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-// CORS setup
+
 
 const allowedOrigins = [
   "https://nexchat44.onrender.com"
