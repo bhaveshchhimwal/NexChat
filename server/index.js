@@ -7,9 +7,10 @@ import cloudinary from "cloudinary";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import rateLimit from "express-rate-limit";
 import { initSocketIO } from "./websockets/socketio.js";
 import userRoutes from "./routes/user.js";
-import aiRoutes from './routes/ai.js';
+import aiRoutes from "./routes/ai.js";
 import messageRoutes from "./routes/message.js";
 
 dotenv.config();
@@ -25,16 +26,11 @@ cloudinary.v2.config({
 
 mongoose.connect(process.env.MONGO_URL);
 
-
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-
-
-const allowedOrigins = [
-  "https://nexchat44.onrender.com"
-];
+const allowedOrigins = ["https://nexchat44.onrender.com"];
 
 app.use(
   cors({
@@ -43,40 +39,56 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error('CORS not allowed'));
+        callback(new Error("CORS not allowed"));
       }
     },
   })
 );
 
-const isDev = process.env.NODE_ENV !== 'production';
+app.set("trust proxy", 1);
+
+const registerLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, 
+  max: 3, 
+  message: {
+    message:
+      "Too many accounts created from this IP address today. Please try again after 24 hours.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+
+const isDev = process.env.NODE_ENV !== "production";
+
+app.use("/user/register", registerLimiter);
 app.use("/user", userRoutes);
 app.use("/ai", aiRoutes);
 app.use("/message", messageRoutes);
 
 if (!isDev) {
-  const clientBuildPath = path.join(__dirname, '../client/dist');
+  const clientBuildPath = path.join(__dirname, "../client/dist");
 
   if (fs.existsSync(clientBuildPath)) {
-    console.log('📁 Serving static files from:', clientBuildPath);
+    console.log("📁 Serving static files from:", clientBuildPath);
     app.use(express.static(clientBuildPath));
 
     app.get(/^(?!\/api).*/, (req, res) => {
-      res.sendFile(path.join(clientBuildPath, 'index.html'));
+      res.sendFile(path.join(clientBuildPath, "index.html"));
     });
   } else {
-    console.log('⚠️ Client build directory not found. Running API only.');
+    console.log("⚠️ Client build directory not found. Running API only.");
     app.get(/^(?!\/api).*/, (req, res) => {
       res.json({
-        message: 'NexChat API is running',
-        status: 'API only mode - frontend not built',
+        message: "NexChat API is running",
+        status: "API only mode - frontend not built",
       });
     });
   }
 }
 
 const PORT = process.env.PORT || 4040;
-const server = app.listen(PORT, '0.0.0.0', () =>
+const server = app.listen(PORT, "0.0.0.0", () =>
   console.log(`Server running on port ${PORT}`)
 );
 
