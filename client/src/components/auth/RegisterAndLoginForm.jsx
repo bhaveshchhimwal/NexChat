@@ -120,10 +120,6 @@ const url = `${baseUrl}/user/${endpoint}`;
           )}
         </div>
       </div>
-
-      <footer className="mt-7 text-xm text-gray-500">
-        Designed & Developed by Bhavesh Chhimwal
-      </footer>
     </div>
   );
 }
