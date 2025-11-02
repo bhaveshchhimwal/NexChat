@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import { validatePassword } from '../utils/validatePassword.js';
+import { validateUsername } from '../utils/validateUsername.js';
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -14,35 +15,48 @@ export const register = async (req, res) => {
     try {
         const { username, password } = req.body;
 
+        const { valid, message, username: validUsername } = validateUsername(username);
+        if (!valid) {
+            return res.status(400).json({ message });
+        }
+
         if (!validatePassword(password)) {
             return res.status(400).json({
                 message: "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character"
             });
         }
-        const existingUser = await User.findOne({ username });
-        if (existingUser) return res.status(400).json({ message: 'User already exists' });
+
+        const existingUser = await User.findOne({ username: validUsername });
+        if (existingUser)
+            return res.status(400).json({ message: "User already exists" });
 
         const hashedPassword = bcrypt.hashSync(password, bcryptSalt);
 
-        const createdUser = await User.create({ username, password: hashedPassword });
+        const createdUser = await User.create({
+            username: validUsername,
+            password: hashedPassword,
+        });
 
         const token = jwt.sign(
-            { userId: createdUser._id, username },
+            { userId: createdUser._id, username: createdUser.username },
             jwtSecret,
-            { expiresIn: '7d' }
+            { expiresIn: "7d" }
         );
 
-        res.cookie('token', token, {
-            sameSite: isDev ? 'lax' : 'none',
+        res.cookie("token", token, {
+            sameSite: isDev ? "lax" : "none",
             secure: !isDev,
             httpOnly: true,
-        }).status(201).json({ id: createdUser._id, username: createdUser.username });
-
+        }).status(201).json({
+            id: createdUser._id,
+            username: createdUser.username,
+        });
     } catch (error) {
-        console.error('Register error:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error("Register error:", error);
+        res.status(500).json({ message: "Server error" });
     }
 };
+
 export const login = async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -55,11 +69,10 @@ export const login = async (req, res) => {
         jwt.sign({ userId: foundUser._id, username }, jwtSecret, {}, (err, token) => {
             if (err) return res.status(500).json({ message: 'JWT Error' });
 
-
             res.cookie('token', token, {
                 httpOnly: true,
-                sameSite: 'None', // cross-origin
-                secure: true,     // HTTPS required
+                sameSite: 'None', 
+                secure: true,    
                 path: '/',
             });
 
