@@ -4,7 +4,6 @@ import authMiddleware from '../middlewares/auth.js';
 
 const router = express.Router();
 
-
 router.get('/:userId', authMiddleware, getMessages);
 
 router.put('/:messageId', authMiddleware, updateMessage);

@@ -7,7 +7,6 @@ import cloudinary from "cloudinary";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import rateLimit from "express-rate-limit";
 import { initSocketIO } from "./websockets/socketio.js";
 import userRoutes from "./routes/user.js";
 import aiRoutes from "./routes/ai.js";
@@ -47,21 +46,9 @@ app.use(
 
 app.set("trust proxy", 1);
 
-const registerLimiter = rateLimit({
-  windowMs: 24 * 60 * 60 * 1000, 
-  max: 3, 
-  message: {
-    message:
-      "Too many accounts created from this IP address today. Please try again after 24 hours.",
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 
 const isDev = process.env.NODE_ENV !== "production";
 
-app.use("/user/register", registerLimiter);
 app.use("/user", userRoutes);
 app.use("/ai", aiRoutes);
 app.use("/message", messageRoutes);
