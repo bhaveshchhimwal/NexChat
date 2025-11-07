@@ -6,55 +6,70 @@ import { validateUsername } from '../utils/validateUsername.js';
 import dotenv from "dotenv";
 
 dotenv.config();
+
 const jwtSecret = process.env.JWT_SECRET;
-const bcryptSalt = bcrypt.genSaltSync(10);
+const bcryptSaltRounds = 10;
 
 const isDev = process.env.NODE_ENV !== 'production';
 
 export const register = async (req, res) => {
-    try {
-        const { username, password } = req.body;
+  try {
+    const { username, password } = req.body ?? {};
 
-        const { valid, message, username: validUsername } = validateUsername(username);
-        if (!valid) {
-            return res.status(400).json({ message });
-        }
-
-        if (!validatePassword(password)) {
-            return res.status(400).json({
-                message: "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character"
-            });
-        }
-
-        const existingUser = await User.findOne({ username: validUsername });
-        if (existingUser)
-            return res.status(400).json({ message: "User already exists" });
-
-        const hashedPassword = bcrypt.hashSync(password, bcryptSalt);
-
-        const createdUser = await User.create({
-            username: validUsername,
-            password: hashedPassword,
-        });
-
-        const token = jwt.sign(
-            { userId: createdUser._id, username: createdUser.username },
-            jwtSecret,
-            { expiresIn: "7d" }
-        );
-
-        res.cookie("token", token, {
-            sameSite: isDev ? "lax" : "none",
-            secure: !isDev,
-            httpOnly: true,
-        }).status(201).json({
-            id: createdUser._id,
-            username: createdUser.username,
-        });
-    } catch (error) {
-        console.error("Register error:", error);
-        res.status(500).json({ message: "Server error" });
+    if (!username || !password) {
+      return res.status(400).json({ message: "Username and password are required." });
     }
+
+    const { valid, message, username: validUsername } = validateUsername(username);
+    if (!valid) {
+      return res.status(400).json({ message });
+    }
+
+    if (!validatePassword(password)) {
+      return res.status(400).json({
+        message:
+          "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character",
+      });
+    }
+
+    const existingUser = await User.findOne({ username: validUsername }).lean();
+    if (existingUser) {
+      return res.status(409).json({ message: "User already exists" });
+    }
+
+
+    const hashedPassword = await bcrypt.hash(password, bcryptSaltRounds);
+
+    const createdUser = await User.create({
+      username: validUsername,
+      password: hashedPassword,
+    });
+
+    const token = jwt.sign(
+      { userId: createdUser._id, username: createdUser.username },
+      jwtSecret,
+      { expiresIn: "7d" }
+    );
+
+    res
+      .cookie("token", token, {
+        sameSite: isDev ? "lax" : "none",
+        secure: !isDev,
+        httpOnly: true,
+        path: "/",
+      })
+      .status(201)
+      .json({
+        id: createdUser._id,
+        username: createdUser.username,
+      });
+  } catch (error) {
+
+    if (error?.code === 11000) {
+      return res.status(409).json({ message: "User already exists" });
+    }
+    return res.status(500).json({ message: "Server error" });
+  }
 };
 
 export const login = async (req, res) => {
