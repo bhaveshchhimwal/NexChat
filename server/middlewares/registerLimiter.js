@@ -1,9 +1,9 @@
 import rateLimit from "express-rate-limit";
 
 export const registerLimiter = rateLimit({
-  windowMs: 24 * 60 * 60 * 1000,
+  windowMs: 24 * 60 * 60 * 1000, 
   max: 3, 
-  skipFailedRequests: true,
+  skipFailedRequests: true, 
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
