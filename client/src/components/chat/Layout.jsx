@@ -34,11 +34,9 @@ export default function Layout() {
   const [showSidebar, setShowSidebar] = useState(false);
   const divUnderMessages = useRef();
 
-
   const showOnlinePeople = createShowOnlinePeople(setOnlinePeople);
   const handleSelectUser = createSelectUser(setSelectedUserId, setShowSidebar);
 
- 
   useEffect(() => {
     const socketInstance = createSocketIO({
       id,
@@ -72,7 +70,6 @@ export default function Layout() {
     if (div) div.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
 
-  
   useEffect(() => {
     axios.get("/user/people").then((res) => {
       const offlinePeopleArr = res.data
@@ -85,7 +82,6 @@ export default function Layout() {
       setOfflinePeople(offlinePeople);
     });
   }, [onlinePeople, id]);
-
 
   useEffect(() => {
     if (selectedUserId) {
@@ -114,7 +110,6 @@ export default function Layout() {
         setShowSidebar={setShowSidebar}
       />
 
-  
       <Sidebar
         showSidebar={showSidebar}
         setShowSidebar={setShowSidebar}
@@ -126,14 +121,14 @@ export default function Layout() {
         logout={logoutFn}
       />
 
-     
       <div className="flex flex-col bg-blue-50 w-full md:w-2/3 p-2 md:p-2 relative pt-16 md:pt-2">
         <ChatWindow
           messages={messages}
           messagesWithoutDupes={messagesWithoutDupes}
           id={id}
           divUnderMessages={divUnderMessages}
-           socket={socket}
+          socket={socket}
+          selectedChat={selectedUserId}    
         />
 
         {!!selectedUserId && (
