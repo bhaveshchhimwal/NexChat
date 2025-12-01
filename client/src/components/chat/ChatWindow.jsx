@@ -9,12 +9,12 @@ import {
   confirmDelete,
 } from "../functions/editDelete.js";
 
-export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket }) {
+export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket, selectedChat }) {
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editText, setEditText] = useState("");
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
-  const menuRefs = useRef({}); 
+  const menuRefs = useRef({});
   const [messages, setMessages] = useState(messagesWithoutDupes);
 
   useEffect(() => {
@@ -23,9 +23,8 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket 
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-    
       const clickedOutside = Object.values(menuRefs.current).every(
-        ref => !ref || !ref.contains(e.target)
+        (ref) => !ref || !ref.contains(e.target)
       );
       if (clickedOutside) {
         setMenuOpenId(null);
@@ -88,14 +87,21 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket 
 
   return (
     <div className="flex-grow relative">
-      {!messages.length && (
+
+
+      {!selectedChat && (
         <div className="flex h-full items-center justify-center text-gray-300 px-4">
-          <div className="md:hidden mb-2">Tap the menu button to select a contact</div>
-          <div className="hidden md:block">&larr; Select a person from the sidebar</div>
+          <div className="text-center">Select a person from the sidebar</div>
         </div>
       )}
 
-      {!!messages.length && (
+
+      {selectedChat && messages.length === 0 && (
+        <div className="flex h-full"></div>
+      )}
+
+      
+      {selectedChat && messages.length > 0 && (
         <div className="relative h-full">
           <div className="overflow-y-scroll absolute top-0 left-0 right-0 bottom-2">
             {messages.map((message) => {
@@ -113,15 +119,21 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket 
               return (
                 <div
                   key={message._id}
-                  className={`flex items-start my-2 gap-1 ${isOwn ? "justify-end" : "justify-start"}`}
+                  className={`flex items-start my-2 gap-1 ${
+                    isOwn ? "justify-end" : "justify-start"
+                  }`}
                 >
-                 
                   {isOwn ? (
                     <div className="w-7 flex-shrink-0 flex items-start pt-1">
                       {!message.isDeleted && canModify && (
-                        <div className="relative" ref={el => menuRefs.current[message._id] = el}>
+                        <div
+                          className="relative"
+                          ref={(el) => (menuRefs.current[message._id] = el)}
+                        >
                           <button
-                            onClick={() => setMenuOpenId(showMenu ? null : message._id)}
+                            onClick={() =>
+                              setMenuOpenId(showMenu ? null : message._id)
+                            }
                             className="p-1 text-gray-400 hover:text-white transition-colors"
                           >
                             <MoreVertical size={18} />
@@ -155,8 +167,8 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket 
                       message.isDeleted
                         ? "bg-gray-200 text-gray-500 italic"
                         : isOwn
-                          ? "bg-blue-500 text-white"
-                          : "bg-white text-gray-700"
+                        ? "bg-blue-500 text-white"
+                        : "bg-white text-gray-700"
                     }`}
                   >
                     {editingMessageId === message._id ? (
@@ -170,7 +182,10 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket 
                           autoFocus
                         />
                         <div className="flex gap-2 mt-1 text-xs justify-end">
-                          <button onClick={handleSave} className="text-green-300 hover:underline">
+                          <button
+                            onClick={handleSave}
+                            className="text-green-300 hover:underline"
+                          >
                             Save
                           </button>
                           <button
@@ -193,7 +208,9 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket 
                             <>
                               {message.text}
                               {message.isEdited && (
-                                <span className="text-xs opacity-70 ml-1">(edited)</span>
+                                <span className="text-xs opacity-70 ml-1">
+                                  (edited)
+                                </span>
                               )}
                             </>
                           )}
@@ -206,7 +223,9 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket 
                                 src={
                                   message.file.startsWith("http")
                                     ? message.file
-                                    : axios.defaults.baseURL + "/uploads/" + message.file
+                                    : axios.defaults.baseURL +
+                                      "/uploads/" +
+                                      message.file
                                 }
                                 alt=""
                                 className="max-w-48 max-h-64 rounded cursor-pointer block object-cover"
@@ -214,7 +233,9 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket 
                                   window.open(
                                     message.file.startsWith("http")
                                       ? message.file
-                                      : axios.defaults.baseURL + "/uploads/" + message.file,
+                                      : axios.defaults.baseURL +
+                                          "/uploads/" +
+                                          message.file,
                                     "_blank"
                                   )
                                 }
@@ -227,7 +248,9 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket 
                                 href={
                                   message.file.startsWith("http")
                                     ? message.file
-                                    : axios.defaults.baseURL + "/uploads/" + message.file
+                                    : axios.defaults.baseURL +
+                                      "/uploads/" +
+                                      message.file
                                 }
                               >
                                 📎 {message.file.split("/").pop()}
