@@ -5,7 +5,7 @@ import { registerWrapper } from "../middlewares/registerWrapper.js";
 
 const router = express.Router();
 
-router.post("/register", registerWrapper(register), registerLimiter);
+router.post("/register", registerLimiter, registerWrapper(register));
 
 router.post("/login", login);
 router.post("/logout", logout);
