@@ -69,11 +69,11 @@ export function createSocketIO({ id, setMessages, showOnlinePeople, setSocket })
 
    
     socket.on("connect", () => {
-      console.log("✅ Socket.IO connected:", socket.id);
+      console.log(" Socket.IO connected:", socket.id);
     });
 
     socket.on("disconnect", () => {
-      console.warn("⚠️ Socket.IO disconnected. Attempting reconnect...");
+      console.warn(" Socket.IO disconnected. Attempting reconnect...");
     });
 
     if (setSocket) setSocket(socket);
