@@ -30,7 +30,6 @@ export function initSocketIO(server) {
     io.emit("online-users", online);
   }
 
-
   io.use((socket, next) => {
     const token = socket.handshake.headers.cookie
       ?.split(";")
@@ -47,10 +46,12 @@ export function initSocketIO(server) {
     });
   });
 
-  
   io.on("connection", (socket) => {
+    socket.join(socket.userId);
+    
+    console.log(`${socket.username} (${socket.userId}) connected and joined room`);
+    
     notifyAboutOnlinePeople();
-
 
     socket.on("send-message", async ({ recipient, text, file }) => {
       try {
@@ -85,33 +86,36 @@ export function initSocketIO(server) {
             isEdited: false,
           };
 
-          for (const s of io.sockets.sockets.values()) {
-            if (s.userId === recipient || s.userId === socket.userId) {
-              s.emit("receive-message", payload);
-            }
-          }
+          io.to(socket.userId).emit("receive-message", payload);
+          io.to(recipient).emit("receive-message", payload);
         }
       } catch (err) {
         console.error("Error sending message:", err);
+        socket.emit("error", { message: "Failed to send message" });
       }
     });
 
     socket.on("update-message", async ({ messageId, newText }) => {
       try {
         const message = await Message.findById(messageId);
-        if (!message) return;
+        if (!message) {
+          return socket.emit("error", { message: "Message not found" });
+        }
 
-        if (message.sender.toString() !== socket.userId) return;
+        if (message.sender.toString() !== socket.userId) {
+          return socket.emit("error", { message: "Not authorized" });
+        }
 
-        
         const createdAtMs = message.createdAt
           ? new Date(message.createdAt).getTime()
           : new Date(message._id.getTimestamp()).getTime();
 
         const messageAge = Date.now() - createdAtMs;
-        const timeLimit = 5 * 60 * 1000; // 5 mins
+        const timeLimit = 5 * 60 * 1000;
 
-        if (messageAge > timeLimit) return;
+        if (messageAge > timeLimit) {
+          return socket.emit("error", { message: "Edit time expired" });
+        }
 
         message.text = newText;
         message.isEdited = true;
@@ -124,33 +128,36 @@ export function initSocketIO(server) {
           updatedAt: message.updatedAt,
         };
 
-        for (const s of io.sockets.sockets.values()) {
-          if (
-            s.userId === message.recipient.toString() ||
-            s.userId === message.sender.toString()
-          ) {
-            s.emit("message-updated", payload);
-          }
-        }
+        io.to(message.sender.toString()).emit("message-updated", payload);
+        io.to(message.recipient.toString()).emit("message-updated", payload);
+        
       } catch (err) {
         console.error("Error updating message:", err);
+        socket.emit("error", { message: "Failed to update message" });
       }
     });
+
     socket.on("delete-message", async ({ messageId }) => {
       try {
         const message = await Message.findById(messageId);
-        if (!message) return;
+        if (!message) {
+          return socket.emit("error", { message: "Message not found" });
+        }
 
-        if (message.sender.toString() !== socket.userId) return;
+        if (message.sender.toString() !== socket.userId) {
+          return socket.emit("error", { message: "Not authorized" });
+        }
 
         const createdAtMs = message.createdAt
           ? new Date(message.createdAt).getTime()
           : new Date(message._id.getTimestamp()).getTime();
 
         const messageAge = Date.now() - createdAtMs;
-        const timeLimit = 5 * 60 * 1000; // 5 mins
+        const timeLimit = 5 * 60 * 1000;
 
-        if (messageAge > timeLimit) return;
+        if (messageAge > timeLimit) {
+          return socket.emit("error", { message: "Delete time expired" });
+        }
 
         message.text = "";
         message.file = null;
@@ -159,20 +166,17 @@ export function initSocketIO(server) {
 
         const payload = { _id: message._id, isDeleted: true };
 
-        for (const s of io.sockets.sockets.values()) {
-          if (
-            s.userId === message.recipient.toString() ||
-            s.userId === message.sender.toString()
-          ) {
-            s.emit("message-deleted", payload);
-          }
-        }
+        io.to(message.sender.toString()).emit("message-deleted", payload);
+        io.to(message.recipient.toString()).emit("message-deleted", payload);
+        
       } catch (err) {
         console.error("Error deleting message:", err);
+        socket.emit("error", { message: "Failed to delete message" });
       }
     });
 
     socket.on("disconnect", () => {
+      console.log(`${socket.username} disconnected`);
       notifyAboutOnlinePeople();
     });
   });
