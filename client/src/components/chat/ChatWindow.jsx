@@ -62,7 +62,10 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket,
       socket.off("message-deleted");
     };
   }, [socket]);
-
+  
+  useEffect(() => {
+    divUnderMessages.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
   const handleEdit = (message) => {
     setEditingMessageId(message._id);
     setEditText(message.text);
