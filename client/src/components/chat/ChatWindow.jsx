@@ -62,10 +62,11 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket,
       socket.off("message-deleted");
     };
   }, [socket]);
-  
+
   useEffect(() => {
     divUnderMessages.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+  
   const handleEdit = (message) => {
     setEditingMessageId(message._id);
     setEditText(message.text);
@@ -103,7 +104,7 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket,
         <div className="flex h-full"></div>
       )}
 
-      
+
       {selectedChat && messages.length > 0 && (
         <div className="relative h-full">
           <div className="overflow-y-scroll absolute top-0 left-0 right-0 bottom-2">
@@ -122,9 +123,8 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket,
               return (
                 <div
                   key={message._id}
-                  className={`flex items-start my-2 gap-1 ${
-                    isOwn ? "justify-end" : "justify-start"
-                  }`}
+                  className={`flex items-start my-2 gap-1 ${isOwn ? "justify-end" : "justify-start"
+                    }`}
                 >
                   {isOwn ? (
                     <div className="w-7 flex-shrink-0 flex items-start pt-1">
@@ -166,13 +166,12 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket,
                   ) : null}
 
                   <div
-                    className={`inline-block p-2 rounded-md text-sm max-w-xs whitespace-pre-wrap ${
-                      message.isDeleted
+                    className={`inline-block p-2 rounded-md text-sm max-w-xs whitespace-pre-wrap ${message.isDeleted
                         ? "bg-gray-200 text-gray-500 italic"
                         : isOwn
-                        ? "bg-blue-500 text-white"
-                        : "bg-white text-gray-700"
-                    }`}
+                          ? "bg-blue-500 text-white"
+                          : "bg-white text-gray-700"
+                      }`}
                   >
                     {editingMessageId === message._id ? (
                       <div>
@@ -227,8 +226,8 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket,
                                   message.file.startsWith("http")
                                     ? message.file
                                     : axios.defaults.baseURL +
-                                      "/uploads/" +
-                                      message.file
+                                    "/uploads/" +
+                                    message.file
                                 }
                                 alt=""
                                 className="max-w-48 max-h-64 rounded cursor-pointer block object-cover"
@@ -237,8 +236,8 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket,
                                     message.file.startsWith("http")
                                       ? message.file
                                       : axios.defaults.baseURL +
-                                          "/uploads/" +
-                                          message.file,
+                                      "/uploads/" +
+                                      message.file,
                                     "_blank"
                                   )
                                 }
@@ -252,8 +251,8 @@ export function ChatWindow({ messagesWithoutDupes, id, divUnderMessages, socket,
                                   message.file.startsWith("http")
                                     ? message.file
                                     : axios.defaults.baseURL +
-                                      "/uploads/" +
-                                      message.file
+                                    "/uploads/" +
+                                    message.file
                                 }
                               >
                                 📎 {message.file.split("/").pop()}
